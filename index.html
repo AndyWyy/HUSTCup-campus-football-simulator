@@ -96,6 +96,16 @@
   .posbtn:active{transform:scale(.97);}
   .posbtn.on{background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 4px 12px rgba(61,155,255,.35);}
   .posbtn.on small{color:rgba(255,255,255,.85);}
+  .collegegrid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:8px 0 12px;}
+  .college-item{display:flex; align-items:center; gap:10px; min-height:76px; padding:9px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; color:var(--ink);
+    text-align:left; cursor:pointer; transition:.15s;}
+  .college-item:active{transform:scale(.98);}
+  .college-item.on{background:linear-gradient(150deg,rgba(61,155,255,.2),var(--card)); border-color:var(--accent);}
+  .college-item .teamlogo{width:44px; height:44px; flex:0 0 auto;}
+  .college-item .college-text{flex:1; min-width:0;}
+  .college-item .college-name{font-size:12px; font-weight:700; line-height:1.35;}
+  .college-item .college-group{margin-top:3px; font-size:10px; color:var(--sub);}
 
   .btn{display:block; width:100%; padding:15px; border:none; border-radius:14px; font-size:16px;
     font-weight:700; cursor:pointer; background:var(--accent); color:#fff; transition:.15s; text-align:center;}
@@ -309,6 +319,16 @@
 
     <div class="spacer"></div>
     <button class="btn mt16" id="btnNumber" disabled>确认号码与位置</button>
+  </div>
+
+  <!-- 选择学院 -->
+  <div class="screen" id="scr-college">
+    <h2>选择你的学院</h2>
+    <p class="muted">从全部学院中选择一个加入。学院名称、队徽和甲组/乙组分组都会显示在下方。</p>
+    <div class="collegegrid" id="collegeGrid"></div>
+    <p class="kicker" id="collegePreview">请选择你要加入的学院</p>
+    <div class="spacer"></div>
+    <button class="btn mt16" id="btnCollege" disabled>确认学院</button>
   </div>
 
   <!-- 球队分配 -->
@@ -3229,12 +3249,48 @@ function setupNumber(){
     btn.disabled = !(numOk && pos);
   };
   input.addEventListener('input', update);
-  btn.onclick = ()=>{ if(!btn.disabled){ state.position = pos; assignTeam(); } };
+  btn.onclick = ()=>{ if(!btn.disabled){ state.position = pos; chooseCollege(); } };
 }
 
-function assignTeam(){
-  const group = Math.random()<0.5?'甲组':'乙组';
-  state.team = { name:pick(GROUPS[group]), group };
+let selectedCollege = null;
+
+function chooseCollege(){
+  selectedCollege = null;
+  show('scr-college');
+  const grid = $('collegeGrid');
+  grid.innerHTML = '';
+  const all = [];
+  for(const group of ['甲组','乙组']){
+    GROUPS[group].forEach(name => all.push({ name, group }));
+  }
+  all.forEach(team=>{
+    const btn = document.createElement('button');
+    btn.className = 'college-item';
+    btn.innerHTML = `${teamLogoHTML(team)}
+      <span class="college-text">
+        <span class="college-name">${team.name}</span>
+        <span class="college-group">${team.group}</span>
+      </span>`;
+    btn.onclick = ()=>{
+      selectedCollege = team;
+      grid.querySelectorAll('.college-item').forEach(x=>x.classList.remove('on'));
+      btn.classList.add('on');
+      $('collegePreview').textContent = `已选择 · ${team.name} · ${team.group}`;
+      $('btnCollege').disabled = false;
+    };
+    grid.appendChild(btn);
+  });
+  $('collegePreview').textContent = '请选择你要加入的学院';
+  $('btnCollege').disabled = true;
+  $('btnCollege').onclick = ()=>{
+    if(selectedCollege) assignTeam(selectedCollege.group, selectedCollege.name);
+  };
+}
+
+function assignTeam(chosenGroup, chosenName){
+  const group = chosenGroup || (Math.random()<0.5?'甲组':'乙组');
+  const name = chosenName || pick(GROUPS[group]);
+  state.team = { name, group };
   state.league = state.team.group;
   state.rosters = { '甲组': GROUPS['甲组'].slice(), '乙组': GROUPS['乙组'].slice() };   // 动态升降级名单
   state.potential = randInt(30,95);
