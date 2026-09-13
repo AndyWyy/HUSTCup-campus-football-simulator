@@ -812,7 +812,7 @@ const REGULAR_EVENTS = [
      ch('接下重任', 0.6, 'ability', {relation:2,ability:1}, {mentality:-2}, '你扛起组织大旗，成为球队大脑。', '你被压力压垮，失误连连。'),
      ch('先稳住现状', 0.85, 'mentality', {mentality:1}, {relation:-1}, '你继续做好本职，稳步成长。', '你错过了上位机会，有些可惜。'),
      ch('主动承担一半', 0.72, 'relation', {relation:1,ability:1}, {mentality:-1}, '你分担了部分组织任务，获得认可。', '你顾此失彼，两头没做好。')]},
-  {id:'exam_vs_match', title:'学业足球冲突', cond:s=>true,
+  {id:'exam_vs_match', title:'学业足球冲突', cond:s=>s.stats.academy<90,
    desc:'一场关键的杯赛和一场重要的专业课考试撞在了同一天。',
    choices:[
      ch('参加比赛', 0.7, 'relation', {relation:2}, {academy:-3}, '你选择上场，比赛赢了，成了英雄。', '你比完赛才发现考试错过了，懊悔不已。'),
@@ -1264,6 +1264,13 @@ function randomSpecialEvents(s){
     list.push({tag:'随机特殊事件', title:'十佳大学生', auto:true,
       desc:'你因学业优异被推荐参评校"十佳大学生"。',
       choices:[{text:'再接再厉', effect:{academy:2,relation:2,mentality:1}, result:'你成功当选十佳大学生，成了大家口中"踢球好、学习也好"的传说。'}]});
+  }
+  if(s.stats.academy > 95 && Math.random() < 0.3){
+    list.push({tag:'校内荣誉 · 国家奖学金', title:'国家奖学金评比', auto:false,
+      desc:'你的学业表现已经达到国家奖学金评比标准，学院推荐你参加本年度评选。',
+      choices:[
+        {text:'认真准备材料', effect:{academy:1,mentality:1,relation:1}, result:'你认真准备评选材料，顺利获得国家奖学金。'},
+        {text:'保持平常心', effect:{mentality:1}, result:'你没有过多分心，最终仍凭借扎实成绩获得提名。'}]});
   }
   // 情伤失恋
   if(Math.random()<0.15){
@@ -3606,9 +3613,10 @@ function balanceEffects(eff){
     let v = eff[k];
     const cur = state.stats[k] ?? 60;
     if(v > 0){
-      if(cur >= 95) v = Math.round(v * 0.2);
-      else if(cur >= 85) v = Math.round(v * 0.5);
-      else if(cur >= 75) v = Math.round(v * 0.75);
+      if(cur >= 92) v = Math.round(v * 0.1);
+      else if(cur >= 85) v = Math.round(v * 0.3);
+      else if(cur >= 75) v = Math.round(v * 0.55);
+      else if(cur >= 65) v = Math.round(v * 0.8);
     } else if(v < 0){
       if(cur <= 10) v = Math.round(v * 0.35);
       else if(cur <= 25) v = Math.round(v * 0.6);
