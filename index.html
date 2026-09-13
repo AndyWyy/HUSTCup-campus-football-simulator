@@ -1538,7 +1538,7 @@ function matchEventPool(){
 function shuffleArray(arr){ return arr.slice().sort(()=>Math.random()-0.5); }
 function groupSizesFor(type, league){
   if(type === '华工杯'){
-    if(league === '同济组') return [8];
+    if(league === '同济组') return [4,4];
     return league === '甲组' ? [6,6] : [4,4,4,5];
   }
   return [4,4,4,4,4,4,3,3];   // 新生杯/毕业杯：主校区29队 + 基础医学院 = 30队
@@ -1668,9 +1668,9 @@ function renderMatchIntro(){
   $('mHeader').innerHTML = `
     <div class="sectitle">${t.type} · ${t.role === 'coach' ? '教练视角' : leagueLabel}</div>
     <div class="m-title">${t.type}</div>
-    <div class="m-sub">${t.type === '华工杯' ? (t.league === '同济组' ? 'Tongji Medical College of HUST · 8 队单循环 · 冠军获得医学球王荣誉' : (t.league === '甲组' ? '12 队 · 2 组单循环 · 每组前 4 进八强 · 末两名打保级附加赛' : '17 队 · 3×4队组+1×5队组 · 每组前 2 出线打八强')) : '30 队 · 8 组（6×4队+2×3队）· 每组前 2 出线进 16 强'}</div>`;
+    <div class="m-sub">${t.type === '华工杯' ? (t.league === '同济组' ? 'Tongji Medical College of HUST · 8 队分 2 组 · 每组前 2 进半决赛 · 冠军获得医学球王荣誉' : (t.league === '甲组' ? '12 队 · 2 组单循环 · 每组前 4 进八强 · 末两名打保级附加赛' : '17 队 · 3×4队组+1×5队组 · 每组前 2 出线打八强')) : '30 队 · 8 组（6×4队+2×3队）· 每组前 2 出线进 16 强'}</div>`;
   $('mBody').innerHTML = `<div class="m-group">${renderGroupBox(t.myGroup)}</div>
-    <div class="result" style="margin-top:12px;">${t.league === '同济组' ? '华工杯同济医学院（Tongji Medical College of HUST）组 8 队进行单循环，冠军将获得“医学球王”荣誉。' : `你所在的 <b>${t.myGroup.name}</b> 共有 ${t.myGroup.teams.length} 支球队，单循环后前 2 名出线。`}每场小组赛你将做出 1-2 次关键抉择。</div>`;
+    <div class="result" style="margin-top:12px;">${t.league === '同济组' ? '华工杯同济医学院（Tongji Medical College of HUST）组 8 队分两组，每组前 2 名出线，随后进行半决赛和决赛。冠军将获得“医学球王”荣誉。' : `你所在的 <b>${t.myGroup.name}</b> 共有 ${t.myGroup.teams.length} 支球队，单循环后前 2 名出线。`}每场小组赛你将做出 1-2 次关键抉择。</div>`;
   $('mActions').innerHTML = `<button class="btn gold" id="mBtn1">开始小组赛</button>`;
   $('mBtn1').onclick = ()=>{ nextPlayerMatch(); };
 }
@@ -1699,17 +1699,6 @@ function finishGroupStage(){
   const t = tourney;
   const table = computeTable(t.myGroup.teams, t.myGroup.matches);
   const myRank = table.findIndex(x => x.team === state.team.name);
-  if(t.type === '华工杯' && t.league === '同济组'){
-    t.myFinish = myRank === 0 ? '冠军' : `第${myRank + 1}名`;
-    t.stage = 'tongji';
-    show('scr-match');
-    $('mHeader').innerHTML = `<div class="sectitle">华工杯 · 同济医学院组收官</div><div class="m-title">同济医学院组积分榜</div>`;
-    $('mBody').innerHTML = `<div class="m-table">${tableHTML(table, myRank)}</div>
-      <div class="result" style="margin-top:12px;">同济医学院（Tongji Medical College of HUST）组单循环结束，你最终排名第 <b>${myRank + 1}</b>。${myRank === 0 ? '你们夺得同济医学院组冠军！' : '本届同济医学院组冠军由积分榜第一名获得。'}</div>`;
-    $('mActions').innerHTML = `<button class="btn gold" id="mBtn1">查看结果</button>`;
-    $('mBtn1').onclick = ()=>{ finishTournament(); };
-    return;
-  }
   const qualified = table.slice(0, 2).map(x => x.team);
   const adv = myRank < (t.type === '华工杯' && t.league === '甲组' ? 4 : 2);
 
@@ -1863,6 +1852,9 @@ function roundNameFor(koIdx){
   const total = t.knockoutRounds.length;
   if(t.knockoutRounds[0].length === 8){ // 16 强起步
     return ['16 强','8 强','半决赛','决赛'][koIdx] || '淘汰赛';
+  }
+  if(t.knockoutRounds[0].length === 2){ // 4 强起步
+    return ['半决赛','决赛'][koIdx] || '淘汰赛';
   }
   // 8 强起步
   return ['8 强','半决赛','决赛'][koIdx] || '淘汰赛';
@@ -2204,7 +2196,10 @@ function finishTournament(){
     if(champion === myName){
       state.championColleges[state.team.name] = true;
       if(t.type === '华工杯'){
-        if(t.league === '甲组'){
+        if(t.league === '同济组'){
+          state.flags.tongjiChampion = true;
+          result = { rank: '冠军', title: '华工杯 · 同济医学院组冠军！', eff: {mentality: 4, relation: 4, ability: 1}, prose: `你们捧起了华工杯同济医学院组冠军奖杯！你在本届赛事共打入 ${t.playerGoals} 球，成为华中科技大学同济医学院（Tongji Medical College of HUST）的焦点。` };
+        } else if(t.league === '甲组'){
           state.flags.jiaChampion = true;
           result = { rank: '冠军', title: '华工杯 · 甲组冠军！', eff: {mentality: 5, relation: 5, ability: 2}, prose: `你们捧起了华工杯甲组冠军奖杯！你在本届赛事共打入 ${t.playerGoals} 球，成为全校瞩目的焦点。` };
         } else {
