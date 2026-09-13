@@ -17,3 +17,7 @@
 
 - GitHub 项目名由 `huagongbei-campus-football-simulator` 修改为 `HUSTCup-campus-football-simulator`。
 - 更新 GitHub Pages 固定访问地址。
+
+### 修复
+
+- 修复点球大战文案判断主客场错误，避免“提示点球输了却晋级”的显示异常。

@@ -2046,7 +2046,8 @@ function finishMatch(){
   const resTitle = won ? '🏆 胜利' : (lost ? '✖ 失利' : '⚖ 平局');
   let penText = '';
   if(pen){
-    penText = `<div class="result" style="margin-top:8px;">常规时间 ${myGoals} : ${oppGoals} 战平，进入点球大战。${pen.took ? (pen.scored ? '你主罚的点球稳稳命中，' : '你主罚的点球遗憾罚失，') : ''}最终${pen.win ? '你们' : '对方'}在点球大战中胜出。</div>`;
+    const myPenWin = (pen.win && t.matchMyHome) || (!pen.win && !t.matchMyHome);
+    penText = `<div class="result" style="margin-top:8px;">常规时间 ${myGoals} : ${oppGoals} 战平，进入点球大战。${pen.took ? (pen.scored ? '你主罚的点球稳稳命中，' : '你主罚的点球遗憾罚失，') : ''}最终${myPenWin ? '你们' : '对方'}在点球大战中胜出。</div>`;
   }
   const roundLabel = t.stage === 'relegation' ? '保级附加赛' : (t.isKey ? (t.knockoutRounds ? roundNameFor(t.koRoundIdx) : '淘汰赛') : '小组赛');
   $('mHeader').innerHTML = `<div class="sectitle">${t.type} · ${roundLabel}</div><div class="m-title">${resTitle}</div>`;
