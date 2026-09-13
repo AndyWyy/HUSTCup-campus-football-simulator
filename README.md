@@ -28,8 +28,11 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 - 队长、裁判、转专业、跨考、服役等生涯路径
 - 受伤、红黄牌停赛、首发替补和校内舆论
 - 比赛决策与系统模拟
+- 本机自动存档与继续游戏
 - 成就与多结局
 
 ## 共同开发
 
 欢迎提出 Issue 或 Pull Request。
+
+更新记录见 [CHANGELOG.md](CHANGELOG.md)。

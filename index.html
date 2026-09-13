@@ -289,6 +289,8 @@
     </div>
     <div class="spacer"></div>
     <button class="btn gold mt16" id="btnName" disabled>开启录取通知书</button>
+    <button class="btn ghost mt16" id="btnContinue" style="display:none;">继续上次存档</button>
+    <button class="btn ghost mt16" id="btnClearSave" style="display:none;">清除本机存档</button>
   </div>
 
   <!-- 选号码 -->
@@ -555,6 +557,38 @@ const state = {
   repeatYear:false,
   log:[]
 };
+
+/* ---------------- 本机存档 ---------------- */
+const SAVE_KEY = 'hustcup_save_v1';
+
+function saveGame(){
+  if(!state.name || !state.team) return;
+  try{
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ savedAt: Date.now(), state }));
+  }catch(e){ /* 浏览器禁用本地存储时静默跳过 */ }
+}
+
+function hasSave(){
+  try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; }
+}
+
+function loadGame(){
+  if(!hasSave()) return false;
+  try{
+    const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if(!data || !data.state || !data.state.team) return false;
+    Object.assign(state, data.state);
+    state.media = state.media || { fans:50, officials:50, fanMessage:'', officialMessage:'' };
+    state.championColleges = state.championColleges || {};
+    return true;
+  }catch(e){ return false; }
+}
+
+function clearSave(){
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){ /* 忽略 */ }
+  $('btnContinue').style.display = 'none';
+  $('btnClearSave').style.display = 'none';
+}
 
 /* ---------------- 成就系统 ---------------- */
 const ACHIEVEMENTS = [
@@ -3062,6 +3096,7 @@ function renderStatusBadges(){
   if(state.cards.red > 0){
     b.push(`<span class="statusbadge risk">🟥 红牌 ${state.cards.red}</span>`);
   }
+  b.push(`<span class="statusbadge">💾 已自动存档</span>`);
   $('statusBadges').innerHTML = b.join('');
   $('fanMedia').textContent = state.media.fanMessage || '暂无消息';
   $('officialMedia').textContent = state.media.officialMessage || '暂无消息';
@@ -3141,6 +3176,17 @@ function initName(){
   $('btnName').disabled = !input.value.trim();
   input.addEventListener('input',()=>{ $('btnName').disabled = !input.value.trim(); });
   $('btnName').onclick = ()=>{ state.name=input.value.trim(); show('scr-number'); setupNumber(); };
+  if(hasSave()){
+    $('btnContinue').style.display = 'block';
+    $('btnClearSave').style.display = 'block';
+    $('btnContinue').onclick = ()=>{
+      if(loadGame()){
+        renderMain();
+        show('scr-main');
+      }
+    };
+    $('btnClearSave').onclick = clearSave;
+  }
 }
 
 function setupNumber(){
@@ -3261,6 +3307,7 @@ function renderMain(){
   renderAchievements('achSummary', 'achGrid');
   $('btnYear').textContent = `开始 ${yearName(state.year, state.path)} 学年`;
   $('btnYear').onclick = startYear;
+  saveGame();
 }
 
 function hintText(){
@@ -3609,6 +3656,7 @@ function yearEnd(){
 function showEnding(){
   const e = determineEnding(state);
   checkAchievements(state);
+  clearSave();
   $('edTag').textContent = e.tag;
   $('edTitle').textContent = e.title;
   $('edQuote').textContent = '“' + e.quote + '”';
