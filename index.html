@@ -709,13 +709,13 @@ const REGULAR_EVENTS = [
      ch('抓住机会', 0.65, 'ability', {ability:2,relation:1}, {mentality:-1}, '你交出了漂亮的首发表现，位置向你倾斜。', '你太过紧张，首发机会被浪费了。'),
      ch('谦让老将', 0.85, 'relation', {relation:2,mentality:1}, {ability:-1}, '你把机会让给老将，更衣室对你多了好感。', '你让出的机会被新人抢走，自己反而边缘化。'),
      ch('主动请缨', 0.6, 'mentality', {ability:1,relation:2}, {mentality:-2}, '你的自信打动了教练，获得重用。', '你的毛遂自荐被当成狂妄，教练脸色难看。')]},
-  {id:'exam_week', title:'考试周来袭', cond:s=>true,
+  {id:'exam_week', title:'考试周来袭', cond:s=>s.stats.academy<90,
    desc:'期末周到了，好几门考试撞在一起，你的时间完全不够用。',
    choices:[
      ch('熬夜复习', statProb({academy:0.02}, 0.25, 0.05, 0.98), 'academy', {academy:3}, {mentality:-2,ability:-1}, '你熬了几个通宵，考试有惊无险。', '你熬夜复习却效率低下，还把自己累垮了。'),
      ch('照常训练', 0.6, 'ability', {ability:2}, {academy:-3}, '你把心思放在球场，球技涨了，考试靠平时积累撑住。', '你错过了复习，几门课成绩惨不忍睹。'),
      ch('找学长划重点', statProb({academy:0.012,relation:0.004}, 0.25, 0.05, 0.95), 'relation', {academy:2,relation:1}, {relation:-1}, '学长给你划了重点，事半功倍。', '你托关系划重点被老师发现，落了不是。')]},
-  {id:'fail_crisis', title:'挂科危机', cond:s=>true,
+  {id:'fail_crisis', title:'挂科危机', cond:s=>s.stats.academy<90,
    desc:'高数成绩亮起红灯，辅导员找你谈话：再挂一门可能影响保研资格。',
    choices:[
      ch('找老师补课', statProb({academy:0.02}, 0.25, 0.05, 0.98), 'academy', {academy:3}, {relation:-1,ability:-1}, '你放弃几次训练补课，分数拉了回来。', '补课效果有限，你还耽误了训练。'),
@@ -812,7 +812,7 @@ const REGULAR_EVENTS = [
      ch('接下重任', 0.6, 'ability', {relation:2,ability:1}, {mentality:-2}, '你扛起组织大旗，成为球队大脑。', '你被压力压垮，失误连连。'),
      ch('先稳住现状', 0.85, 'mentality', {mentality:1}, {relation:-1}, '你继续做好本职，稳步成长。', '你错过了上位机会，有些可惜。'),
      ch('主动承担一半', 0.72, 'relation', {relation:1,ability:1}, {mentality:-1}, '你分担了部分组织任务，获得认可。', '你顾此失彼，两头没做好。')]},
-  {id:'exam_vs_match', title:'学业足球冲突', cond:s=>true,
+  {id:'exam_vs_match', title:'学业足球冲突', cond:s=>s.stats.academy<90,
    desc:'一场关键的杯赛和一场重要的专业课考试撞在了同一天。',
    choices:[
      ch('参加比赛', 0.7, 'relation', {relation:2}, {academy:-3}, '你选择上场，比赛赢了，成了英雄。', '你比完赛才发现考试错过了，懊悔不已。'),
@@ -896,13 +896,13 @@ const REGULAR_EVENTS = [
      ch('球场发泄', 0.6, 'ability', {ability:2,mentality:1}, {mentality:-2}, '你把难过踢进每一个射门，状态爆发。', '你越想越烦，踢球都走神。'),
      ch('祝福放下', 0.75, 'mentality', {mentality:2}, {mentality:-1}, '你真诚祝福，自己慢慢释怀。', '你嘴上说放下，心里还是难受。'),
      ch('专注学业', 0.7, 'academy', {academy:2,mentality:1}, {mentality:-1}, '你用学习填满自己，成绩大涨。', '你心不在焉，书也看不进去。')]},
-  {id:'academic_warning', title:'学业警告', cond:s=>true,
+  {id:'academic_warning', title:'学业警告', cond:s=>s.stats.academy<90,
    desc:'你的绩点已经触到红线，教务处发了学业预警，再挂科就要面临留级。',
    choices:[
      ch('全力补救', statProb({academy:0.02}, 0.2, 0.05, 0.96), 'academy', {academy:3,mentality:1}, {ability:-2}, '你拼了命补课，绩点拉了回来。', '你基础太差，补起来很吃力。'),
      ch('求助学霸', statProb({academy:0.015,relation:0.004}, 0.25, 0.05, 0.94), 'relation', {academy:2,relation:1}, {relation:-1}, '学霸带你飞，成绩稳步回升。', '你太依赖别人，考试还是不会。'),
      ch('放弃挣扎', 0.4, 'mentality', {mentality:1}, {academy:-3,mentality:-2}, '你索性摆烂，反而轻松了。', '你彻底摆烂，挂科留级，前途堪忧。')]},
-  {id:'exam_crash', title:'考试失利', cond:s=>true,
+  {id:'exam_crash', title:'考试失利', cond:s=>s.stats.academy<90,
    desc:'一门重要的专业课成绩出来，你考砸了，这对你的绩点和保研计划是沉重打击。',
    choices:[
      ch('补考翻盘', statProb({academy:0.02}, 0.2, 0.05, 0.97), 'academy', {academy:3}, {mentality:-2}, '你卧薪尝胆，补考高分翻盘。', '你补考依然失利，雪上加霜。'),
