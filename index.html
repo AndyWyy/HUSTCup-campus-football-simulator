@@ -476,6 +476,9 @@ const GROUPS = {
     '中欧清洁与可再生能源学院','公共管理学院','化学与化工学院','哲学学院','外国语学院',
     '建筑与城市规划学院','数学与统计学院','新闻与信息传播学院','法学院','环境科学与工程学院',
     '生命科学与技术学院','社会学院','管理学院','经济学院','网络空间安全学院','航空航天学院','软件学院'
+  ],
+  '同济组': [
+    '第一临床学院','第二临床学院','法医学系','公共卫生学院','护理学院','基础医学院','药学院','医药卫生管理学院'
   ]
 };
 
@@ -494,7 +497,10 @@ const TIERS = {
   '网络空间安全学院':3, '化学与化工学院':3, '航空航天学院':3, '软件学院':3,
   '公共管理学院':3, '管理学院':3, '外国语学院':3,
   // T4（3 队）
-  '法学院':4, '社会学院':4, '哲学学院':4
+  '法学院':4, '社会学院':4, '哲学学院':4,
+  // 同济医学院组：第一/第二临床接近乙组四强，其余按乙组水平
+  '第一临床学院':2, '第二临床学院':2,
+  '法医学系':3, '公共卫生学院':3, '护理学院':3, '基础医学院':3, '药学院':3, '医药卫生管理学院':3
 };
 const TIER_BASE = [88, 79, 70, 61, 52];  // T0-T4 基础强度值（百分制内部量纲）
 const TIER_LABEL = ['T0 · 王者之师','T1 · 一流劲旅','T2 · 中坚力量','T3 · 中游偏下','T4 · 弱势之师'];
@@ -570,12 +576,13 @@ const state = {
   militaryYearsTotal:0,
   militaryYearsCompleted:0,
   militaryYearsRemaining:0,
+  medical:false,
   cupSeasonCount:0,
   championColleges:{},
   flags:{ bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
           kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
-          xinshengChampion:false, biyeChampion:false, crossExam:false },
+          xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false },
   achievements:{},
   showChoiceDetails:false,
   repeatYear:false,
@@ -623,6 +630,7 @@ const ACHIEVEMENTS = [
   {id:'varsity_star', icon:'🌟', name:'校队之星', desc:'入选学校足球队', check:s=>s.flags.varsity},
   {id:'champion_glory', icon:'🏆', name:'甲组之巅', desc:'夺得华工杯甲组冠军', check:s=>s.flags.jiaChampion},
   {id:'yi_champion_glory', icon:'🥈', name:'乙组之王', desc:'夺得华工杯乙组冠军', check:s=>s.flags.yiChampion},
+  {id:'medical_ball_king', icon:'🩺', name:'医学球王', desc:'夺得华工杯同济组冠军', check:s=>s.flags.tongjiChampion},
   {id:'all_rounder', icon:'💎', name:'全能战士', desc:'四维数值全部达到 80', check:s=>Object.values(s.stats).every(v=>v>=80)},
   {id:'academic_elite', icon:'📚', name:'学业巅峰', desc:'学业值达到 90', check:s=>s.stats.academy>=90},
   {id:'iron_comeback', icon:'🛡️', name:'重伤归来', desc:'遭遇重伤后能力仍达到 75', check:s=>s.flags.bigInjury && s.stats.ability>=75},
@@ -630,7 +638,7 @@ const ACHIEVEMENTS = [
   {id:'military_service', icon:'🪖', name:'军旅归来', desc:'完成两年服役并保留学籍', check:s=>s.flags.militaryServed},
   {id:'fan_favorite', icon:'🐦', name:'校园顶流', desc:'校内球迷关注度达到 80', check:s=>s.media.fans>=80},
   {id:'official_recognition', icon:'📢', name:'官方认可', desc:'HUSTFootball 关注度达到 80', check:s=>s.media.officials>=80},
-  {id:'highest_mountain_longest_river', icon:'🏔️', name:'最高的山、最长的河', desc:'完成13年最长生涯，且每个学年都有华工杯出战纪录', check:s=>s.path==='读博' && totalYears(s.path)===13 && s.cupSeasonCount>=baseTotalYears(s.path)},
+  {id:'highest_mountain_longest_river', icon:'🏔️', name:'最高的山、最长的河', desc:'完成13年最长生涯，且每个学年都有华工杯出战纪录', check:s=>s.path==='读博' && (baseTotalYears(s.path) + (s.flags.militaryServed ? 2 : 0) + (s.flags.transferExtended ? 1 : 0)) === 13 && s.cupSeasonCount>=baseTotalYears(s.path)},
   {id:'grand_slam', icon:'👑', name:'全满贯', desc:'夺得新生杯、华工杯乙组、华工杯甲组、毕业杯冠军', check:s=>s.flags.xinshengChampion && s.flags.yiChampion && s.flags.jiaChampion && s.flags.biyeChampion},
   {id:'dual_college_legend', icon:'🏛️', name:'双院名宿', desc:'代表至少两个不同学院分别夺得杯赛冠军', check:s=>Object.keys(s.championColleges || {}).length>=2},
   {id:'referee_path', icon:'🟨', name:'黑衣初亮相', desc:'加入足球协会成为裁判员', check:s=>s.flags.referee},
@@ -996,6 +1004,7 @@ function milestoneEvent(year, s){
       {text:'先熟悉校园', effect:{academy:1, mentality:2}, result:'你花时间摸清了教室、食堂和图书馆的位置，很快融入了大学生活。'},
       {text:'宅在宿舍歇着', effect:{academy:-2, mentality:1}, result:'你在宿舍窝了几天，错过了认识队友的机会，好在心情放松了不少。'}]
   };
+  if(year===1 && s.medical && !s.flags.medicalSplit) return medicalStreamEvent(s);
   if(year===1) return {
     tag:'大二 · 年度特殊事件', title:'队长竞选', auto:false,
     desc:'原队长毕业，队里开始竞选新队长。你是有力的候选人之一。',
@@ -1006,9 +1015,9 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-2}, result:'你在竞选中落败，有些失落，但也看清了自己的差距。'};
         }},
       {text:'支持他人', effect:{relation:2,mentality:1}, result:'你主动推举了队友，自己在队里也很有分量。'}]};
-  if(year===2) return {
-    tag:'大三 · 年度特殊事件', title:'升学抉择', auto:false,
-    desc:'大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
+  if(year === (s.medical ? 3 : 2)) return {
+    tag: s.medical ? '医学大四 · 升学抉择' : '大三 · 年度特殊事件', title:'升学抉择', auto:false,
+    desc: s.medical ? '医学大四结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
       {text:'保研外校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
           const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
@@ -1053,13 +1062,14 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-3}, result:'你尽了全力，却与跨考目标失之交臂。校园足球的生涯，似乎也要到此为止了。'};
         }},
       {text:'直接就业', effect:{}, result:'你决定毕业后先走向社会，绿茵场上的故事即将收尾。', path:'就业'}]};
-  if(year===3) return {
-    tag:'大四 · 年度特殊事件', title:'毕业', auto:true,
-    desc:'本科四年走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。',
-    choices:[{text:'回望四年', effect:{}, result:'这四年，有笑有泪，都成了青春里最滚烫的一页。'}]};
+  if(year === (s.medical ? 4 : 3)) return {
+    tag: s.medical ? '医学大五 · 毕业' : '大四 · 年度特殊事件', title:'毕业', auto:true,
+    desc: s.medical ? '医学五年本科走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。' : '本科四年走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。',
+    choices:[{text:'回望校园', effect:{}, result: s.medical ? '这五年，有笑有泪，都成了青春里最滚烫的一页。' : '这四年，有笑有泪，都成了青春里最滚烫的一页。'}]};
   // 深造年份
+  const undergradYears = s.medical ? 5 : 4;
   if(s.path==='读研'){
-    if(year===6){ // 研三：读博抉择
+    if(year === undergradYears + 2){ // 研三：读博抉择
       return { tag:'深造 · 年度特殊事件', title:'读博抉择', auto:false,
         desc:'研三即将结束，你站在继续深造与步入社会的路口。导师问你是否愿意继续攻读博士。',
         choices:[
@@ -1071,19 +1081,19 @@ function milestoneEvent(year, s){
           {text:'硕士毕业就业', effect:{}, result:'你决定硕士毕业后走向社会，绿茵生涯即将画上句点。'}]};
     }
     const titles=['研一 · 开题','研二 · 论文攻坚'];
-    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-4,1)]||'研究生阶段', auto:true,
+    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-undergradYears,1)]||'研究生阶段', auto:true,
       desc:'研究生生活节奏紧凑，你需要在实验室与球场之间艰难平衡。',
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
   if(s.path==='直博'){
     const titles=['博一 · 文献综述','博二 · 实验推进','博三 · 论文发表','博四 · 毕业答辩'];
-    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-4,3)]||'博士生阶段', auto:true,
+    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-undergradYears,3)]||'博士生阶段', auto:true,
       desc:'博士阶段的压力前所未有，足球成了你为数不多的出口。',
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
   if(s.path==='读博'){
     const titles=['博一 · 课题开题','博二 · 实验攻关','博三 · 博士答辩'];
-    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-7,2)]||'博士生阶段', auto:true,
+    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-(undergradYears+3),2)]||'博士生阶段', auto:true,
       desc:'博士阶段的科研压力与日俱增，足球成了你为数不多的出口。',
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
@@ -1107,6 +1117,38 @@ function captainMilestone(year, s){
         }},
       {text:'交出袖标', effect:{mentality:1, relation:1}, result:'你选择把袖标交出去，卸下队长的担子，专心踢好自己的球。', resolve:s=>{ s.isCaptain=false; return {}; }}
     ]
+  };
+}
+
+/* ---------------- 医学分流 ---------------- */
+function medicalStreamEvent(s){
+  if(!s.medical || s.flags.medicalSplit) return null;
+  const options = [
+    ['第一临床学院', 85],
+    ['第二临床学院', 80],
+    ['法医学系', 75],
+    ['药学院', 70],
+    ['公共卫生学院', 65],
+    ['医药卫生管理学院', 65],
+    ['护理学院', 60],
+    ['基础医学院', 0]
+  ];
+  return {tag:'医学 · 年度特殊事件', title:'医学分流', auto:false,
+    desc:'大二学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习，并根据学业成绩分流。',
+    choices: options.map(([name, req])=>({
+      text: name,
+      warn: req ? `需要学业值达到 ${req}` : '',
+      cond: s=>s.stats.academy >= req,
+      effect:{},
+      result:`你成功分流进入${name}，从本届华工杯开始代表该学院参加华工杯同济医学院（Tongji Medical College of HUST）组比赛。`,
+      resolve:s=>{
+        s.team = { name, group:'同济组' };
+        s.league = '同济组';
+        s.flags.medicalSplit = true;
+        s.medical = true;
+        return {};
+      }
+    }))
   };
 }
 
@@ -1152,6 +1194,8 @@ function assignTransferCollege(s, sophomore){
   s.team = { name, group };
   s.league = group;
   s.isCaptain = false;
+  s.medical = false;
+  s.flags.medicalSplit = false;
   s.flags.transferDone = true;
   if(sophomore){
     s.year = 0;
@@ -1166,14 +1210,15 @@ function transferExamEvent(s){
   if((s.year !== 0 && s.year !== 1) || s.flags.transferAttempted) return null;
   const sophomore = s.year === 1;
   const base = sophomore ? 0.3 : 0.55;
+  const medical = !!s.medical;
   return {tag:'转专业 · 学业事件', title:'转专业考试', auto:false,
     desc: sophomore
-      ? '大二学年，学校开放转专业考试。大二报名者需要更高的学业水平，成功后转入新的学院，并降级到大一，直接以新身份参加本届华工杯。'
-      : '新生杯结束后，学校开放转专业考试。大一报名者学业要求相对较低，成功后重新分配学院，并从本届华工杯开始启用新身份。',
+      ? (medical ? '医学分流后，你可以通过转专业考试转入主校区普通学院，并降级到大一。' : '大二学年，学校开放转专业考试。大二报名者需要更高的学业水平，成功后转入新的学院，并降级到大一，直接以新身份参加本届华工杯。')
+      : (medical ? '基础医学院学生可以在大一通过转专业考试转入主校区普通学院。' : '新生杯结束后，学校开放转专业考试。大一报名者学业要求相对较低，成功后重新分配学院，并从本届华工杯开始启用新身份。'),
     choices:[
       {text:'报名参加转专业考试', flag:'transferAttempted', probFn:statProb({academy:0.012}, base, 0.05, 0.9), stat:'academy',
        good:{academy:1, mentality:2}, bad:{mentality:-2, academy:-1},
-       goodText: sophomore ? '你通过转专业考试，转入新的学院，学校将你的学籍调整至大一，新的华工杯身份立即生效。' : '你通过转专业考试，转入新的学院，新身份将从本届华工杯开始生效。',
+       goodText: sophomore ? '你通过转专业考试，转入主校区普通学院，学校将你的学籍调整至大一，新的华工杯身份立即生效。' : '你通过转专业考试，转入主校区普通学院，新身份将从本届华工杯开始生效。',
        badText:'你未能通过转专业考试，留在原学院。转专业报名机会已经用完。',
        onSuccess:s=>{ assignTransferCollege(s, sophomore); }},
       {text:'暂不参加', effect:{}, result:'你没有报名转专业考试，继续留在原学院完成本学年。'}
@@ -1213,7 +1258,7 @@ function refereeCertEvent(s){
 
 function refereeFinalEvent(s){
   if(!s.flags.referee || s.flags.refereeFinal) return null;
-  if(s.year !== baseTotalYears(s.path)-1 || s.refereeLevel<2) return null;
+  if(s.year !== academicYears(s.path, s)-1 || s.refereeLevel<2) return null;
   return {tag:'裁判 · 生涯事件', title:'决赛裁判', auto:false,
     desc:'足协正式选派你担任毕业杯决赛的主裁判。这是校园裁判生涯的最高舞台，全场目光都会落在你的哨声上。',
     choices:[
@@ -1224,7 +1269,7 @@ function refereeFinalEvent(s){
 
 function refereeYearEvent(s){
   if(!s.flags.referee) return null;
-  if(s.year === baseTotalYears(s.path)-1 && s.refereeLevel>=2 && !s.flags.refereeFinal){
+  if(s.year === academicYears(s.path, s)-1 && s.refereeLevel>=2 && !s.flags.refereeFinal){
     return refereeFinalEvent(s);
   }
   if(s.refereeLevel<3 && Math.random() < (REFEREE_CLASS_CHANCE[s.refereeLevel] ?? 0.5)){
@@ -1492,8 +1537,11 @@ function matchEventPool(){
 /* ---- 分组 / 赛程 ---- */
 function shuffleArray(arr){ return arr.slice().sort(()=>Math.random()-0.5); }
 function groupSizesFor(type, league){
-  if(type === '华工杯') return league === '甲组' ? [6,6] : [4,4,4,5];
-  return [4,4,4,4,4,3,3,3];   // 新生杯/毕业杯：29 队 = 5×4队 + 3×3队
+  if(type === '华工杯'){
+    if(league === '同济组') return [8];
+    return league === '甲组' ? [6,6] : [4,4,4,5];
+  }
+  return [4,4,4,4,4,4,3,3];   // 新生杯/毕业杯：主校区29队 + 基础医学院 = 30队
 }
 function groupTeams(teams, sizes){
   const shuffled = shuffleArray(teams);
@@ -1575,13 +1623,26 @@ function isKnockoutMatch(match){
 
 /* 启动一场赛事 */
 function launchTournament(type, role, onDone){
-  const league = state.league;
-  const teams = type === '华工杯' ? state.rosters[league].slice() : [...state.rosters['甲组'], ...state.rosters['乙组']];
+  let league = state.league;
+  let teams;
+  if(type === '华工杯'){
+    if(state.medical && state.flags.medicalSplit){
+      league = '同济组';
+    }
+    teams = state.rosters[league].slice();
+  } else if(type === '毕业杯'){
+    league = '毕业杯';
+    teams = [...state.rosters['甲组'], ...state.rosters['乙组'], '基础医学院'];
+  } else {
+    league = '全部球队';
+    teams = [...state.rosters['甲组'], ...state.rosters['乙组'], '基础医学院'];
+  }
   const sizes = groupSizesFor(type, league);
   const groups = groupTeams(teams, sizes);
   groups.forEach(g => { g.matches = simulateGroupMatches(g, state.team.name); });
   tourney = {
     type, role, league, groups,
+    medicalRep: state.medical && state.flags.medicalSplit && type !== '新生杯',
     myGroup: groups.find(g => g.teams.includes(state.team.name)),
     playerGoals: 0, playerAssists: 0,
     playerYellows: 0,
@@ -1596,15 +1657,20 @@ function launchTournament(type, role, onDone){
   renderMatchIntro();
 }
 
+function leagueDisplayName(league){
+  return league === '同济组' ? '同济医学院组' : league;
+}
+
 function renderMatchIntro(){
   const t = tourney;
   $('mStats').innerHTML = statBarHTML();
+  const leagueLabel = leagueDisplayName(t.league);
   $('mHeader').innerHTML = `
-    <div class="sectitle">${t.type} · ${t.role === 'coach' ? '教练视角' : (t.league === '甲组' ? '甲组' : (t.type === '华工杯' ? '乙组' : '全部球队'))}</div>
+    <div class="sectitle">${t.type} · ${t.role === 'coach' ? '教练视角' : leagueLabel}</div>
     <div class="m-title">${t.type}</div>
-    <div class="m-sub">${t.type === '华工杯' ? (t.league === '甲组' ? '12 队 · 2 组单循环 · 每组前 4 进八强 · 末两名打保级附加赛' : '17 队 · 3×4队组+1×5队组 · 每组前 2 出线打八强') : '29 队 · 8 组（5×4队+3×3队）· 每组前 2 出线进 16 强'}</div>`;
+    <div class="m-sub">${t.type === '华工杯' ? (t.league === '同济组' ? 'Tongji Medical College of HUST · 8 队单循环 · 冠军获得医学球王荣誉' : (t.league === '甲组' ? '12 队 · 2 组单循环 · 每组前 4 进八强 · 末两名打保级附加赛' : '17 队 · 3×4队组+1×5队组 · 每组前 2 出线打八强')) : '30 队 · 8 组（6×4队+2×3队）· 每组前 2 出线进 16 强'}</div>`;
   $('mBody').innerHTML = `<div class="m-group">${renderGroupBox(t.myGroup)}</div>
-    <div class="result" style="margin-top:12px;">你所在的 <b>${t.myGroup.name}</b> 共有 ${t.myGroup.teams.length} 支球队，单循环后前 2 名出线。每场小组赛你将做出 1-2 次关键抉择。</div>`;
+    <div class="result" style="margin-top:12px;">${t.league === '同济组' ? '华工杯同济医学院（Tongji Medical College of HUST）组 8 队进行单循环，冠军将获得“医学球王”荣誉。' : `你所在的 <b>${t.myGroup.name}</b> 共有 ${t.myGroup.teams.length} 支球队，单循环后前 2 名出线。`}每场小组赛你将做出 1-2 次关键抉择。</div>`;
   $('mActions').innerHTML = `<button class="btn gold" id="mBtn1">开始小组赛</button>`;
   $('mBtn1').onclick = ()=>{ nextPlayerMatch(); };
 }
@@ -1632,8 +1698,19 @@ function nextPlayerMatch(){
 function finishGroupStage(){
   const t = tourney;
   const table = computeTable(t.myGroup.teams, t.myGroup.matches);
-  const qualified = table.slice(0, 2).map(x => x.team);
   const myRank = table.findIndex(x => x.team === state.team.name);
+  if(t.type === '华工杯' && t.league === '同济组'){
+    t.myFinish = myRank === 0 ? '冠军' : `第${myRank + 1}名`;
+    t.stage = 'tongji';
+    show('scr-match');
+    $('mHeader').innerHTML = `<div class="sectitle">华工杯 · 同济医学院组收官</div><div class="m-title">同济医学院组积分榜</div>`;
+    $('mBody').innerHTML = `<div class="m-table">${tableHTML(table, myRank)}</div>
+      <div class="result" style="margin-top:12px;">同济医学院（Tongji Medical College of HUST）组单循环结束，你最终排名第 <b>${myRank + 1}</b>。${myRank === 0 ? '你们夺得同济医学院组冠军！' : '本届同济医学院组冠军由积分榜第一名获得。'}</div>`;
+    $('mActions').innerHTML = `<button class="btn gold" id="mBtn1">查看结果</button>`;
+    $('mBtn1').onclick = ()=>{ finishTournament(); };
+    return;
+  }
+  const qualified = table.slice(0, 2).map(x => x.team);
   const adv = myRank < (t.type === '华工杯' && t.league === '甲组' ? 4 : 2);
 
   // 华工杯甲组后两名 → 保级附加赛（输者降级）
@@ -2112,6 +2189,15 @@ function finishTournament(){
     result = t.relegated
       ? { rank: '降级', title: '华工杯甲组 · 降级', eff: {mentality: -4, relation: -2}, prose: '你们在保级附加赛中落败，下赛季将降入乙组。全队都很难过，你暗下决心要打回来。' }
       : { rank: '保级', title: '华工杯甲组 · 保级成功', eff: {mentality: 2, relation: 1}, prose: '你们在保级附加赛中胜出，成功留在甲组。' };
+  } else if(t.stage === 'tongji'){
+    if(t.myFinish === '冠军'){
+      state.championColleges[state.team.name] = true;
+      state.flags.tongjiChampion = true;
+      result = { rank: '冠军', title: '华工杯 · 同济医学院组冠军！', eff: {mentality: 4, relation: 4, ability: 1}, prose: `你们捧起了华工杯同济医学院组冠军奖杯！你在本届赛事共打入 ${t.playerGoals} 球，成为华中科技大学同济医学院（Tongji Medical College of HUST）的焦点。` };
+    } else {
+      const rank = t.myFinish || '小组未出线';
+      result = { rank, title: `华工杯同济医学院组 · ${rank}`, eff: {mentality: 1, relation: 1}, prose: `同济医学院组单循环结束，你们最终获得${rank}。` };
+    }
   } else if(t.stage === 'knockout'){
     const lastRound = t.knockoutRounds[t.knockoutRounds.length - 1];
     const champion = lastRound[0] ? lastRound[0].winner : null;
@@ -2127,7 +2213,7 @@ function finishTournament(){
         }
       } else {
         if(t.type === '新生杯') state.flags.xinshengChampion = true;
-        if(t.type === '毕业杯') state.flags.biyeChampion = true;
+        if(t.type === '毕业杯' && !t.medicalRep) state.flags.biyeChampion = true;
         result = { rank: '冠军', title: `${t.type} 冠军！`, eff: {mentality: 4, relation: 5, ability: 2}, prose: `你们捧起了${t.type}的冠军奖杯！你在本届赛事共打入 ${t.playerGoals} 球，成为全校瞩目的焦点。` };
       }
     } else {
@@ -2182,7 +2268,7 @@ function finishTournament(){
     applyStats(result.eff);
     updateSquadRole();
     if(result.rank === '冠军'){
-      const honor = t.type === '华工杯' ? `华工杯${t.league}冠军` : `${t.type}冠军`;
+      const honor = t.type === '华工杯' ? `华工杯${leagueDisplayName(t.league)}冠军` : `${t.type}冠军`;
       postMedia('fans', `${state.name} 带队夺得${honor}，球迷群彻底沸腾了！`, {fans:12});
       postMedia('officials', `HUSTFootball：${state.name} 率队夺得${honor}，本届赛事共打入 ${t.playerGoals} 球。`, {officials:9});
     } else if(result.rank === '亚军'){
@@ -3044,7 +3130,8 @@ function yearProgressHTML(){
 }
 
 function teamLogoHTML(t){
-  const src = `${t.group}球队logo/${t.name}.png`;
+  const folder = (t.group === '基础医学院' || t.group === '同济组') ? '同济医学院' : t.group;
+  const src = `${folder}球队logo/${t.name}.png`;
   return `<img src="${src}" onerror="this.outerHTML='${t.name[0]}'">`;
 }
 function teamBarHTML(t){
@@ -3144,11 +3231,14 @@ function renderStatusBadges(){
 }
 
 const YEAR_NAMES = ['大一','大二','大三','大四','研一','研二','研三','博一','博二','博三','博四'];
+const MEDICAL_YEAR_NAMES = ['医学大一','医学大二','医学大三','医学大四','医学大五'];
 function yearName(y, path){
-  if(y<4) return YEAR_NAMES[y];
-  if(path==='读研') return ['研一','研二','研三'][Math.min(y-4,2)]||'研究生';
-  if(path==='直博') return ['博一','博二','博三','博四'][Math.min(y-4,3)]||'博士生';
-  if(path==='读博') return ['博一','博二','博三'][Math.min(y-7,2)]||'博士生';
+  const undergradYears = state.medical ? 5 : 4;
+  if(y < undergradYears) return state.medical ? (MEDICAL_YEAR_NAMES[y] || '医学本科') : YEAR_NAMES[y];
+  const g = y - undergradYears;
+  if(path==='读研') return ['研一','研二','研三'][Math.min(g,2)]||'研究生';
+  if(path==='直博') return ['博一','博二','博三','博四'][Math.min(g,3)]||'博士生';
+  if(path==='读博') return ['博一','博二','博三'][Math.min(g-3,2)]||'博士生';
   return YEAR_NAMES[y]||'深造';
 }
 
@@ -3171,8 +3261,12 @@ function baseTotalYears(path){
   if(path==='读博') return 10;
   return 4;
 }
+function academicYears(path, s){
+  const target = s || state;
+  return baseTotalYears(path) + (target.medical ? 1 : 0);
+}
 function totalYears(path){
-  return baseTotalYears(path) + (state.flags.militaryServed ? 2 : 0) + (state.flags.transferExtended ? 1 : 0);
+  return academicYears(path, state) + (state.flags.militaryServed ? 2 : 0) + (state.flags.transferExtended ? 1 : 0);
 }
 function milestonesHTML(){
   const m = [];
@@ -3182,10 +3276,12 @@ function milestonesHTML(){
   if(state.flags.varsity) m.push(['校队','入选校队']);
   if(state.flags.jiaChampion) m.push(['荣誉','华工杯甲组冠军']);
   if(state.flags.yiChampion) m.push(['荣誉','华工杯乙组冠军']);
+  if(state.flags.tongjiChampion) m.push(['荣誉','医学球王']);
   if(state.flags.xinshengChampion) m.push(['荣誉','新生杯冠军']);
   if(state.flags.biyeChampion) m.push(['荣誉','毕业杯冠军']);
   if(state.flags.transferDone) m.push(['转专业','转入'+state.team.name]);
   if(state.flags.transferExtended) m.push(['学籍','降级大一']);
+  if(state.flags.medicalSplit) m.push(['医学','医学院分流']);
   if(state.league && state.league !== state.team.group){
     m.push([state.league==='甲组'?'升级':'降级', state.league==='甲组'?'升入甲组':'降至乙组']);
   }
@@ -3284,6 +3380,7 @@ function chooseCollege(){
   for(const group of ['甲组','乙组']){
     GROUPS[group].forEach(name => all.push({ name, group }));
   }
+  all.push({ name:'基础医学院', group:'基础医学院' });
   all.forEach(team=>{
     const btn = document.createElement('button');
     btn.className = 'college-item';
@@ -3313,7 +3410,8 @@ function assignTeam(chosenGroup, chosenName){
   const name = chosenName || pick(GROUPS[group]);
   state.team = { name, group };
   state.league = state.team.group;
-  state.rosters = { '甲组': GROUPS['甲组'].slice(), '乙组': GROUPS['乙组'].slice() };   // 动态升降级名单
+  state.rosters = { '甲组': GROUPS['甲组'].slice(), '乙组': GROUPS['乙组'].slice(), '同济组': GROUPS['同济组'].slice() };   // 动态升降级名单
+  state.medical = group === '基础医学院';
   state.potential = randInt(30,95);
   state.stats.ability = randInt(60,80);
   state.stats.mentality = 60; state.stats.relation = 60; state.stats.academy = 60;
@@ -3331,13 +3429,14 @@ function assignTeam(chosenGroup, chosenName){
   state.militaryYearsTotal = 0;
   state.militaryYearsCompleted = 0;
   state.militaryYearsRemaining = 0;
+  state.medical = false;
   state.cupSeasonCount = 0;
   state.championColleges = {};
   state.achievements = {};
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
                   kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
-                  xinshengChampion:false, biyeChampion:false, crossExam:false };
+                  xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false };
   state.log = [];
 
   const tier = potentialTier(state.potential);
@@ -3397,10 +3496,11 @@ function hintText(){
 /* 里程碑触发时机：开始型（新生杯、队长竞选）在年度开始；结束型（升学、毕业、读博抉择、答辩）在年度结束 */
 function isEndMilestone(s){
   const y = s.year;
-  if(y===2 || y===3) return true;           // 大三升学、大四毕业
-  if(s.path==='读研' && y===6) return true;  // 研三读博抉择
-  if(s.path==='直博' && y===7) return true;  // 博四答辩
-  if(s.path==='读博' && y===9) return true;  // 博三答辩
+  const undergradYears = s.medical ? 5 : 4;
+  if(y===undergradYears-2 || y===undergradYears-1) return true;  // 升学、毕业
+  if(s.path==='读研' && y===undergradYears+2) return true;  // 研三读博抉择
+  if(s.path==='直博' && y===undergradYears+3) return true;  // 博四答辩
+  if(s.path==='读博' && y===undergradYears+5) return true;  // 博三答辩
   return false;                               // 新生杯、队长竞选等
 }
 
@@ -3450,7 +3550,7 @@ function startYear(){
     if(transferEv) seq.push({ type:'event', ev: transferEv });
   }
   // 华工杯（每年触发）
-  seq.push({ type:'tourney', tourney:'华工杯', role:'player' });
+  seq.push({ type:'tourney', tourney:'华工杯', role:'player', cond: s => !(s.medical && !s.flags.medicalSplit) });
   // 常规事件（少）+ 随机
   regularAfter.forEach(e => seq.push({ type:'event', ev: e }));
   randoms.forEach(e => seq.push({ type:'event', ev: e }));
@@ -3458,8 +3558,16 @@ function startYear(){
   const refereeEv = refereeYearEvent(state);
   if(refereeEv) seq.push({ type:'event', ev: refereeEv });
   // 毕业杯（大四毕业 / 深造毕业年级毕业前）
-  if(year === baseTotalYears(state.path) - 1){
-    seq.push({ type:'tourney', tourney:'毕业杯', role:'player' });
+  if(year === academicYears(state.path, state) - 1){
+    if(state.medical && state.flags.medicalSplit){
+      let savedTeam = state.team;
+      seq.push({ type:'tourney', tourney:'毕业杯', role:'player',
+        before:()=>{ savedTeam = state.team; state.team = { name:'基础医学院', group:'基础医学院' }; state.league='毕业杯'; },
+        after:()=>{ state.team = savedTeam; state.league = savedTeam.group === '同济组' ? '同济组' : savedTeam.group; }
+      });
+    } else {
+      seq.push({ type:'tourney', tourney:'毕业杯', role:'player' });
+    }
   }
   // 结束型里程碑
   if(ms && isEnd) seq.push({ type:'event', ev: ms });
@@ -3476,7 +3584,8 @@ function processQueue(){
   state.yearPlanDone++;
   if(item.type === 'tourney'){
     if(item.cond && !item.cond(state)){ return processQueue(); }
-    launchTournament(item.tourney, item.role, ()=>{ processQueue(); });
+    if(item.before) item.before();
+    launchTournament(item.tourney, item.role, ()=>{ if(item.after) item.after(); processQueue(); });
     return;
   }
   current = item.ev;
@@ -3744,7 +3853,7 @@ function yearEnd(){
   }
 
   // 判断是否结束生涯
-  const isFinal = state.year === baseTotalYears(state.path) - 1;
+  const isFinal = state.year === academicYears(state.path, state) - 1;
 
   if(isFinal){ $('btnYearEnd').textContent='查看结局'; $('btnYearEnd').onclick=()=>showEnding(); }
   else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ state.year++; renderMain(); show('scr-main'); }; }
