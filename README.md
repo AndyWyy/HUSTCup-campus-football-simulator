@@ -12,7 +12,13 @@
 
 ## 在线游玩
 
-GitHub Pages 发布后，可通过固定网址直接访问。
+固定访问网址：
+
+https://fantasicrap.github.io/huagongbei-campus-football-simulator/
+
+仓库地址：
+
+https://github.com/Fantasicrap/huagongbei-campus-football-simulator
 
 ## 主要系统
 
