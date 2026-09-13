@@ -14,11 +14,11 @@
 
 固定访问网址：
 
-https://fantasicrap.github.io/huagongbei-campus-football-simulator/
+https://fantasicrap.github.io/HUSTCup-campus-football-simulator/
 
 仓库地址：
 
-https://github.com/Fantasicrap/huagongbei-campus-football-simulator
+https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 
 ## 主要系统
 
