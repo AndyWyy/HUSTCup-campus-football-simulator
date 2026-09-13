@@ -630,7 +630,7 @@ const ACHIEVEMENTS = [
   {id:'varsity_star', icon:'🌟', name:'校队之星', desc:'入选学校足球队', check:s=>s.flags.varsity},
   {id:'champion_glory', icon:'🏆', name:'甲组之巅', desc:'夺得华工杯甲组冠军', check:s=>s.flags.jiaChampion},
   {id:'yi_champion_glory', icon:'🥈', name:'乙组之王', desc:'夺得华工杯乙组冠军', check:s=>s.flags.yiChampion},
-  {id:'medical_ball_king', icon:'🩺', name:'医学球王', desc:'夺得华工杯同济组冠军', check:s=>s.flags.tongjiChampion},
+  {id:'medical_ball_king', icon:'🩺', name:'医学球王', desc:'夺得华工杯同济医学院组冠军', check:s=>s.flags.tongjiChampion},
   {id:'all_rounder', icon:'💎', name:'全能战士', desc:'四维数值全部达到 80', check:s=>Object.values(s.stats).every(v=>v>=80)},
   {id:'academic_elite', icon:'📚', name:'学业巅峰', desc:'学业值达到 90', check:s=>s.stats.academy>=90},
   {id:'iron_comeback', icon:'🛡️', name:'重伤归来', desc:'遭遇重伤后能力仍达到 75', check:s=>s.flags.bigInjury && s.stats.ability>=75},
