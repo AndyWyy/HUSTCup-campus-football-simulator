@@ -1011,7 +1011,7 @@ function milestoneEvent(year, s){
     desc:'大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
       {text:'保研外校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
-          const p = clamp(0.25 + (s.stats.academy - 85) * 0.02, 0.15, 0.92);
+          const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
           if(Math.random() < p){
             s.path='外校深造';
             return {effect:{academy:1}, result:'你获得了保研资格，并选择保送至外校深造。本科生涯结束后，你将去另一座城市续写青春。'};
@@ -1019,7 +1019,7 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-2}, result:'你没能获得外校保研资格，只能另寻出路（还可考虑保研本校、考研或直接就业）。'};
         }},
       {text:'保研本校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
-          const p = clamp(0.25 + (s.stats.academy - 85) * 0.02, 0.15, 0.92);
+          const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
           if(Math.random() < p){
             s.path = Math.random()<0.5 ? '读研' : '直博';
             return {effect:{academy:1}, result:'你获得了保研资格，并选择留在华科继续深造。'};
