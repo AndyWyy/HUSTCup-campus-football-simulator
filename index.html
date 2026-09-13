@@ -3703,10 +3703,7 @@ function yearEnd(){
   }
 
   // 判断是否结束生涯
-  const isFinal = (state.year===3 && (state.path==='就业'||state.path==='外校深造'))
-    || (state.path==='读研' && state.year===6)
-    || (state.path==='直博' && state.year===7)
-    || (state.path==='读博' && state.year===9);
+  const isFinal = state.year === baseTotalYears(state.path) - 1;
 
   if(isFinal){ $('btnYearEnd').textContent='查看结局'; $('btnYearEnd').onclick=()=>showEnding(); }
   else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ state.year++; renderMain(); show('scr-main'); }; }
