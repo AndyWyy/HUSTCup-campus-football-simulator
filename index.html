@@ -3556,12 +3556,12 @@ function choiceDetailText(c){
   if(c.detail) return c.detail;
   if(c.prob != null || c.probFn){
     const {p, scale} = choiceRollParams(c);
-    const good = scaledEffects(c.good, scale);
-    const bad = scaledEffects(c.bad, scale);
+    const good = balanceEffects(scaledEffects(c.good, scale));
+    const bad = balanceEffects(scaledEffects(c.bad, scale));
     return `成功 ${Math.round(p*100)}%：${effectText(good) || '无变化'}；失败：${effectText(bad) || '无变化'}`;
   }
   if(c.effect && Object.keys(c.effect).length){
-    return `确定结果：${effectText(c.effect)}`;
+    return `确定结果：${effectText(balanceEffects(c.effect))}`;
   }
   if(c.resolve) return '结果由动态概率决定';
   return '';
