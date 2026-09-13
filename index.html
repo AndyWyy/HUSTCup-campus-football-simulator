@@ -1010,14 +1010,21 @@ function milestoneEvent(year, s){
     tag:'大三 · 年度特殊事件', title:'升学抉择', auto:false,
     desc:'大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
-      {text:'保研', effect:{}, result:'', resolve:s=>{
+      {text:'保研外校', effect:{}, result:'', resolve:s=>{
           const p = statProb({academy:0.02}, 0.1, 0.03, 0.9)(s);  // 学业越高越容易保研，不达标也可尝试
           if(Math.random() < p){
-            if(Math.random() < 0.3){ s.path='外校深造'; return {effect:{academy:1}, result:'你获得了保研资格，并成功保送至外校深造，将去另一座城市续写青春。'}; }
-            s.path = Math.random()<0.5 ? '读研' : '直博';
-            return {effect:{academy:1}, result:'你获得了保研资格，继续留在华科深造。'};
+            s.path='外校深造';
+            return {effect:{academy:1}, result:'你获得了保研资格，并选择保送至外校深造。本科生涯结束后，你将去另一座城市续写青春。'};
           }
-          return {effect:{mentality:-2}, result:'你没能获得保研资格，只能另寻出路（还可考虑考研或直接就业）。'};
+          return {effect:{mentality:-2}, result:'你没能获得外校保研资格，只能另寻出路（还可考虑保研本校、考研或直接就业）。'};
+        }},
+      {text:'保研本校', effect:{}, result:'', resolve:s=>{
+          const p = statProb({academy:0.02}, 0.1, 0.03, 0.9)(s);
+          if(Math.random() < p){
+            s.path = Math.random()<0.5 ? '读研' : '直博';
+            return {effect:{academy:1}, result:'你获得了保研资格，并选择留在华科继续深造。'};
+          }
+          return {effect:{mentality:-2}, result:'你没能获得本校保研资格，只能另寻出路。'};
         }},
       {text:'考研', effect:{}, result:'', resolve:s=>{
           const a = s.stats.academy;
@@ -1954,12 +1961,12 @@ function rollMatchInjury(){
   if(Math.random() >= p) return;
   const r = Math.random();
   if(r < 0.45){
-    setInjury('脚踝扭伤', '轻微', randInt(1,2), {ability:-1, mentality:-1}, '预计缺席1-2场比赛');
+    setInjury('脚踝扭伤', '轻微', randInt(1,2), {ability:-1, mentality:-1, relation:-1}, '预计缺席1-2场比赛');
   } else if(r < 0.85){
-    setInjury('肌肉拉伤', '中度', randInt(3,5), {ability:-3, mentality:-2}, '预计缺席3-5场比赛');
+    setInjury('肌肉拉伤', '中度', randInt(3,5), {ability:-3, mentality:-2, relation:-2}, '预计缺席3-5场比赛');
   } else {
     state.flags.bigInjury = true;
-    setInjury('韧带撕裂', '重伤', randInt(8,12), {ability:-6, mentality:-3, academy:-2}, '预计缺席8-12场比赛');
+    setInjury('韧带撕裂', '重伤', randInt(8,12), {ability:-6, mentality:-3, relation:-3, academy:-2}, '预计缺席8-12场比赛');
   }
 }
 
@@ -3054,7 +3061,8 @@ function statBarHTML(values){
 /* ---------------- 首发、伤病、停赛与校内舆论 ---------------- */
 function updateSquadRole(){
   const p = performance(state.stats);
-  const chance = clamp(0.35 + (p - 70) * 0.03 + (state.stats.relation - 60) * 0.004, 0.15, 0.92);
+  const injuryPenalty = state.injury ? ({轻微:0.08, 中度:0.18, 重伤:0.3}[state.injury.severity] || 0) : 0;
+  const chance = clamp(0.35 + (p - 70) * 0.03 + (state.stats.relation - 60) * 0.004 - injuryPenalty, 0.08, 0.92);
   state.squadRole = Math.random() < chance ? '首发' : '替补';
 }
 
@@ -3674,6 +3682,10 @@ function yearEnd(){
     $('btnYearEnd').textContent = '次年重来';
     $('btnYearEnd').onclick = ()=>{ state.repeatYear=false; renderMain(); show('scr-main'); };
     show('scr-year'); return;
+  }
+  if(state.injury){
+    addLog(`学年结束，${state.injury.name} 已完全恢复`, '伤病');
+    state.injury = null;
   }
   state.yearPlanDone = state.yearPlanTotal;
   const g = annualGrowth(state);
