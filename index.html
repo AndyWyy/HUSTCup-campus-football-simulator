@@ -1010,16 +1010,16 @@ function milestoneEvent(year, s){
     tag:'大三 · 年度特殊事件', title:'升学抉择', auto:false,
     desc:'大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
-      {text:'保研外校', effect:{}, result:'', resolve:s=>{
-          const p = statProb({academy:0.02}, 0.1, 0.03, 0.9)(s);  // 学业越高越容易保研，不达标也可尝试
+      {text:'保研外校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
+          const p = clamp(0.25 + (s.stats.academy - 85) * 0.02, 0.15, 0.92);
           if(Math.random() < p){
             s.path='外校深造';
             return {effect:{academy:1}, result:'你获得了保研资格，并选择保送至外校深造。本科生涯结束后，你将去另一座城市续写青春。'};
           }
           return {effect:{mentality:-2}, result:'你没能获得外校保研资格，只能另寻出路（还可考虑保研本校、考研或直接就业）。'};
         }},
-      {text:'保研本校', effect:{}, result:'', resolve:s=>{
-          const p = statProb({academy:0.02}, 0.1, 0.03, 0.9)(s);
+      {text:'保研本校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
+          const p = clamp(0.25 + (s.stats.academy - 85) * 0.02, 0.15, 0.92);
           if(Math.random() < p){
             s.path = Math.random()<0.5 ? '读研' : '直博';
             return {effect:{academy:1}, result:'你获得了保研资格，并选择留在华科继续深造。'};
@@ -1028,7 +1028,7 @@ function milestoneEvent(year, s){
         }},
       {text:'考研', effect:{}, result:'', resolve:s=>{
           const a = s.stats.academy;
-          const p = clamp(0.35 + (s.flags.militaryServed ? 0.2 : 0) + (a-55)*0.012, 0.2, s.flags.militaryServed ? 0.95 : 0.85);
+          const p = clamp(0.28 + (s.flags.militaryServed ? 0.18 : 0) + (a-60)*0.012, 0.15, s.flags.militaryServed ? 0.92 : 0.85);
           if(Math.random() < p){
             if(Math.random() < 0.3){ s.path='外校深造'; return {effect:{mentality:1}, result:`你挑灯苦读，最终考上了外校的研究生！将去另一座城市继续学业。${s.flags.militaryServed ? '你的服役经历为考研带来了政策支持。' : ''}`}; }
             s.path='读研'; return {effect:{mentality:1,academy:1}, result:`你挑灯苦读，最终考上了研究生！接下来将开启读研生涯。${s.flags.militaryServed ? '你的服役经历为考研带来了政策支持。' : ''}`};
@@ -1038,7 +1038,7 @@ function milestoneEvent(year, s){
         }},
       {text:'跨考', effect:{}, result:'', resolve:s=>{
           const a = s.stats.academy;
-          const p = clamp(0.18 + (s.flags.militaryServed ? 0.15 : 0) + (a - 60) * 0.015, 0.08, s.flags.militaryServed ? 0.85 : 0.75);
+          const p = clamp(0.15 + (s.flags.militaryServed ? 0.12 : 0) + (a - 65) * 0.013, 0.08, s.flags.militaryServed ? 0.8 : 0.72);
           if(Math.random() < p){
             assignTransferCollege(s, false);
             s.flags.crossExam = true;
