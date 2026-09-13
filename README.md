@@ -71,7 +71,7 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 
 ### 华工杯同济医学院组
 
-基础医学院学生在大二分流后，进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业。同济医学院组 8 支球队进行独立单循环：
+基础医学院学生在大二分流后，进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业。同济医学院组 8 支球队分为两组，每组前两名出线，随后进行半决赛和决赛：
 
 - 第一临床学院、第二临床学院
 - 法医学系、公共卫生学院、护理学院
