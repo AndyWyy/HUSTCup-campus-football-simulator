@@ -590,6 +590,7 @@ const state = {
   stats:{ ability:60, mentality:60, relation:60, academy:60 },
   potential:0,
   year:0,           // 0=大一 1=大二 2=大三 3=大四 4=研一/博一 ...
+  calendarYear:2026,
   path:'undergrad', // undergrad | 读研 | 直博 | 外校深造 | 就业
   isCaptain:false,
   yearPlanTotal:0,
@@ -642,6 +643,7 @@ function loadGame(){
     const data = JSON.parse(localStorage.getItem(SAVE_KEY));
     if(!data || !data.state || !data.state.team) return false;
     Object.assign(state, data.state);
+    state.calendarYear = state.calendarYear || 2026;
     state.media = state.media || { fans:50, officials:50, fanMessage:'', officialMessage:'' };
     state.championColleges = state.championColleges || {};
     return true;
@@ -1361,12 +1363,27 @@ function randomSpecialEvents(s){
     {name:'国家德比', time:'半夜'},
     {name:'双红会', time:'凌晨'},
     {name:'曼市德比', time:'凌晨'},
-    {name:'伦敦德比', time:'半夜'}
+    {name:'伦敦德比', time:'半夜'},
+    {name:'欧洲超级杯', time:'凌晨'},
+    {name:'马德里德比', time:'凌晨'},
+    {name:'德国国家德比', time:'半夜'},
+    {name:'意大利国家德比', time:'凌晨'},
+    {name:'米兰德比', time:'凌晨'}
   ];
   if(Math.random() < 0.22){
     const match = pick(NIGHT_MATCHES);
     list.push({tag:'非赛事期 · 熬夜看球', title:`熬夜看球 · ${match.name}`, auto:false,
       desc:`${match.name}在${match.time}开打，正好最近球队没有比赛。你要不要熬夜观看？`,
+      choices:[
+        ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。'),
+        ch('只看半场', 0.75, 'mentality', {mentality:1}, {ability:-1}, '你只看半场后休息，既过了瘾又保留了状态。', '你没能忍住，还是看完了下半场。'),
+        ch('早点休息', 0.85, 'mentality', {academy:1, mentality:1}, {}, '你放弃看球，早早休息，保持了学习和训练状态。', '你心里一直惦记比赛，反而没睡好。')
+      ]});
+  }
+  if(((s.calendarYear || 2026) % 4 === 2) && Math.random() < 0.8){
+    const stage = pick(['小组赛','淘汰赛','半决赛','决赛']);
+    list.push({tag:'世界杯 · 熬夜看球', title:`世界杯${stage}`, auto:false,
+      desc:`${s.calendarYear || 2026}年是世界杯年，今晚${stage}在深夜开打。你要不要熬夜观看？`,
       choices:[
         ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。'),
         ch('只看半场', 0.75, 'mentality', {mentality:1}, {ability:-1}, '你只看半场后休息，既过了瘾又保留了状态。', '你没能忍住，还是看完了下半场。'),
@@ -3811,6 +3828,7 @@ function assignTeam(chosenGroup, chosenName){
   state.rosters = { '甲组': GROUPS['甲组'].slice(), '乙组': GROUPS['乙组'].slice(), '同济组': GROUPS['同济组'].slice() };   // 动态升降级名单
   state.medical = group === '基础医学院';
   state.seasonChampions = initialSeasonChampions();
+  state.calendarYear = 2026;
   state.potential = randInt(30,95);
   state.stats.ability = randInt(60,80);
   state.stats.mentality = 60; state.stats.relation = 60; state.stats.academy = 60;
@@ -3865,7 +3883,7 @@ function renderMain(){
   $('pcTalent').textContent = `天赋：${potentialTier(state.potential).label}`;
   $('pcNum').textContent = state.number;
   // 顶栏年份
-  $('mainYear').textContent = yearName(state.year, state.path);
+  $('mainYear').textContent = `${yearName(state.year, state.path)} · ${state.calendarYear || 2026}`;
   // 生涯进度
   const total = totalYears(state.path);
   const cur = state.year + 1 + (state.militaryYearsCompleted || 0) + (state.flags.transferExtended ? 1 : 0);
@@ -4265,6 +4283,7 @@ function serviceYear(){
   const current = total - state.militaryYearsRemaining + 1;
   state.militaryYearsRemaining--;
   state.militaryYearsCompleted++;
+  state.calendarYear = (state.calendarYear || 2026) + 1;
   addLog(`服役第 ${current} 年结束`, '服役');
   $('yrYear').textContent = yearName(state.year, state.path);
   $('yrTitle').textContent = `${yearName(state.year, state.path)} · 服役第 ${current} 年`;
@@ -4322,7 +4341,7 @@ function yearEnd(){
   const isFinal = state.year === academicYears(state.path, state) - 1;
 
   if(isFinal){ $('btnYearEnd').textContent='查看结局'; $('btnYearEnd').onclick=()=>showEnding(); }
-  else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ state.year++; renderMain(); show('scr-main'); }; }
+  else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ state.year++; state.calendarYear = (state.calendarYear || 2026) + 1; renderMain(); show('scr-main'); }; }
   show('scr-year');
 }
 
