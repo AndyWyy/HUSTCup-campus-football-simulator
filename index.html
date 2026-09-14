@@ -598,7 +598,7 @@ const state = {
   achievements:{},
   showChoiceDetails:false,
   repeatYear:false,
-  extendedYearApplied:false,
+  extendedYears:0,
   log:[]
 };
 
@@ -1028,9 +1028,9 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-2}, result:'你在竞选中落败，有些失落，但也看清了自己的差距。'};
         }},
       {text:'支持他人', effect:{relation:2,mentality:1}, result:'你主动推举了队友，自己在队里也很有分量。'}]};
-  if(year === (s.medical ? 4 : 2)) return {
-    tag: s.medical ? '医学大五 · 升学抉择' : '大三 · 年度特殊事件', title:'升学抉择', auto:false,
-    desc: s.medical ? '医学大五结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
+  if(year === (s.medical ? 4 : 3)) return {
+    tag: s.medical ? '医学大五 · 升学抉择' : '大四 · 升学抉择', title:'升学抉择', auto:false,
+    desc: s.medical ? '医学大五结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大四结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
       {text:'保研外校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
           const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
@@ -1075,14 +1075,10 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-3}, result:'你尽了全力，却与跨考目标失之交臂。校园足球的生涯，似乎也要到此为止了。'};
         }},
       {text:'直接就业', effect:{}, result:'你决定毕业后先走向社会，绿茵场上的故事即将收尾。', path:'就业'}]};
-  if(year === 3 && !s.medical) return {
-    tag:'大四 · 年度特殊事件', title:'毕业', auto:true,
-    desc:'本科四年走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。',
-    choices:[{text:'回望校园', effect:{}, result:'这四年，有笑有泪，都成了青春里最滚烫的一页。'}]};
   // 深造年份
   const undergradYears = s.medical ? 5 : 4;
   if(s.path==='读研'){
-    if(year === undergradYears + 2){ // 研三：读博抉择
+    if(year === undergradYears + 2 + (s.extendedYears || 0)){ // 研三延后：读博抉择
       return { tag:'深造 · 年度特殊事件', title:'读博抉择', auto:false,
         desc:'研三即将结束，你站在继续深造与步入社会的路口。导师问你是否愿意继续攻读博士。',
         choices:[
@@ -1093,20 +1089,23 @@ function milestoneEvent(year, s){
             }},
           {text:'硕士毕业就业', effect:{}, result:'你决定硕士毕业后走向社会，绿茵生涯即将画上句点。'}]};
     }
+    const g = year - undergradYears;
     const titles=['研一 · 开题','研二 · 论文攻坚'];
-    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-undergradYears,1)]||'研究生阶段', auto:true,
+    return { tag:'深造 · 年度特殊事件', title:g < 3 ? (titles[Math.min(g,1)]||'研究生阶段') : `研${chineseNumber(g + 1)} · 延毕攻坚`, auto:true,
       desc:'研究生生活节奏紧凑，你需要在实验室与球场之间艰难平衡。',
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
   if(s.path==='直博'){
+    const g = year - undergradYears;
     const titles=['博一 · 文献综述','博二 · 实验推进','博三 · 论文发表','博四 · 毕业答辩'];
-    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-undergradYears,3)]||'博士生阶段', auto:true,
+    return { tag:'深造 · 年度特殊事件', title:g < 4 ? (titles[g]||'博士生阶段') : `博${chineseNumber(g + 1)} · 延毕攻坚`, auto:true,
       desc:'博士阶段的压力前所未有，足球成了你为数不多的出口。',
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
   if(s.path==='读博'){
+    const g = year - (undergradYears + 3);
     const titles=['博一 · 课题开题','博二 · 实验攻关','博三 · 博士答辩'];
-    return { tag:'深造 · 年度特殊事件', title:titles[Math.min(year-(undergradYears+3),2)]||'博士生阶段', auto:true,
+    return { tag:'深造 · 年度特殊事件', title:g < 3 ? (titles[g]||'博士生阶段') : `博${chineseNumber(g + 1)} · 延毕攻坚`, auto:true,
       desc:'博士阶段的科研压力与日俱增，足球成了你为数不多的出口。',
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
@@ -1347,10 +1346,10 @@ function randomSpecialEvents(s){
       choices:[{text:'重新适应', effect:{academy:-3,mentality:-1}, result:'你换到了新方向，前期的积累付诸东流，只能咬牙重来。'}]});
   }
   // 深造期间：延毕 5%
-  if(inGrad(s) && !state.flags.extendGraduation && Math.random()<0.05){
+  if(inGrad(s) && Math.random()<0.05){
     list.push({tag:'深造 · 随机事件', title:'论文受阻 · 延毕', auto:true,
       desc:'论文进度严重滞后，你面临延毕一年。',
-      choices:[{text:'咬牙坚持', effect:{academy:-2,mentality:-2}, result:'你延毕了一年，这段日子格外煎熬。', extendGraduation:true}]});
+      choices:[{text:'咬牙坚持', effect:{academy:-2,mentality:-2}, result:'你延毕了一年，将在下一学年继续当前培养阶段。', resolve:s=>{ s.flags.extendGraduation = true; s.extendedYears = (s.extendedYears || 0) + 1; return {}; }}]});
   }
   // 队内失和 10%
   if(Math.random()<0.10){
@@ -3242,13 +3241,15 @@ function renderStatusBadges(){
 
 const YEAR_NAMES = ['大一','大二','大三','大四','研一','研二','研三','博一','博二','博三','博四'];
 const MEDICAL_YEAR_NAMES = ['医学大一','医学大二','医学大三','医学大四','医学大五'];
+const CN_NUMBERS = ['零','一','二','三','四','五','六','七','八','九','十'];
+function chineseNumber(n){ return n <= 10 ? CN_NUMBERS[n] : String(n); }
 function yearName(y, path){
   const undergradYears = state.medical ? 5 : 4;
   if(y < undergradYears) return state.medical ? (MEDICAL_YEAR_NAMES[y] || '医学本科') : YEAR_NAMES[y];
   const g = y - undergradYears;
-  if(path==='读研') return ['研一','研二','研三'][Math.min(g,2)]||'研究生';
-  if(path==='直博') return ['博一','博二','博三','博四'][Math.min(g,3)]||'博士生';
-  if(path==='读博') return ['博一','博二','博三'][Math.min(g-3,2)]||'博士生';
+  if(path==='读研') return g < 3 ? (['研一','研二','研三'][g] || '研究生') : `研${chineseNumber(g + 1)}`;
+  if(path==='直博') return g < 4 ? (['博一','博二','博三','博四'][g] || '博士生') : `博${chineseNumber(g + 1)}`;
+  if(path==='读博') return g < 3 ? (['博一','博二','博三'][g] || '博士生') : `博${chineseNumber(g + 1)}`;
   return YEAR_NAMES[y]||'深造';
 }
 
@@ -3273,7 +3274,7 @@ function baseTotalYears(path){
 }
 function academicYears(path, s){
   const target = s || state;
-  return baseTotalYears(path) + (target.medical ? 1 : 0);
+  return baseTotalYears(path) + (target.medical ? 1 : 0) + (target.extendedYears || 0);
 }
 function totalYears(path){
   return academicYears(path, state) + (state.flags.militaryServed ? 2 : 0) + (state.flags.transferExtended ? 1 : 0);
@@ -3436,7 +3437,7 @@ function assignTeam(chosenGroup, chosenName){
   state.cards = { yellow:0, red:0 };
   state.suspension = { matchesLeft:0 };
   state.media = { fans:50, officials:50, fanMessage:'', officialMessage:'' };
-  state.extendedYearApplied = false;
+  state.extendedYears = 0;
   state.militaryYearsTotal = 0;
   state.militaryYearsCompleted = 0;
   state.militaryYearsRemaining = 0;
@@ -3507,10 +3508,11 @@ function hintText(){
 function isEndMilestone(s){
   const y = s.year;
   const undergradYears = s.medical ? 5 : 4;
-  if(y===undergradYears-1 || (!s.medical && y===undergradYears-2)) return true;  // 升学、毕业
-  if(s.path==='读研' && y===undergradYears+2) return true;  // 研三读博抉择
-  if(s.path==='直博' && y===undergradYears+3) return true;  // 博四答辩
-  if(s.path==='读博' && y===undergradYears+5) return true;  // 博三答辩
+  if(y===undergradYears-1) return true;  // 本科末年升学
+  const ext = s.extendedYears || 0;
+  if(s.path==='读研' && y===undergradYears+2+ext) return true;  // 研三/延后读博抉择
+  if(s.path==='直博' && y===undergradYears+3+ext) return true;  // 博四/延后答辩
+  if(s.path==='读博' && y===undergradYears+5+ext) return true;  // 博三/延后答辩
   return false;                               // 新生杯、队长竞选等
 }
 
@@ -3889,11 +3891,6 @@ function yearEnd(){
   if(state.injury){
     addLog(`学年结束，${state.injury.name} 已完全恢复`, '伤病');
     state.injury = null;
-  }
-  if(state.flags.extendGraduation && !state.extendedYearApplied){
-    state.extendedYearApplied = true;
-    state.year = Math.max(0, state.year - 1);
-    addLog('因延毕调整，下一年重读当前学年', '学业');
   }
   state.yearPlanDone = state.yearPlanTotal;
   const g = applyStats(annualGrowth(state));
