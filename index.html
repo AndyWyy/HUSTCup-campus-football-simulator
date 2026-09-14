@@ -1718,6 +1718,87 @@ const EASTER_EVENTS = [
    ]}
 ];
 
+const BETWEEN_MATCH_EVENTS = [
+  {tag:'赛事间歇 · 抉择', title:'野球邀约', desc:'下一场比赛还有 2 天，球队的学长拉你去踢野球，你去不去？',
+   choices:[
+    {text:'去', effect:{relation:1, mentality:1}, result:'', resolve:s=>{
+      const risk = clamp(0.40 - (s.stats.ability - 60) * 0.0075, 0.10, 0.40);
+      if(Math.random() < risk){
+        setInjury('脚踝扭伤', '轻微', 1, {ability:-1, mentality:-1, relation:-1}, '野球中不慎受伤');
+        return {effect:{relation:1, mentality:1}, result:'你去了野球场，和学长们踢得很尽兴，但不慎扭伤脚踝，需要休息一场。'};
+      }
+      return {effect:{relation:1, mentality:1}, result:'你去了野球场，和学长们踢得很尽兴，状态也放松了不少。'};
+    }},
+    {text:'不去', effect:{relation:-1}, result:'你拒绝了邀约，安心休息备战下一场。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'校园足球之夜', desc:'宿舍楼下的校园足球群约大家一起看历届华工杯经典录像，你要不要参加？',
+   choices:[
+    {text:'参加并认真复盘', effect:{ability:1, mentality:1}, result:'你从历届华工杯录像里读出了不少校园赛场的细节。'},
+    {text:'参加但只看半场', effect:{relation:1}, result:'你和大家看了一会儿，随后按时回宿舍休息。'},
+    {text:'早点休息', effect:{academy:1, mentality:1}, result:'你放弃看球，早早休息，保持了比赛状态。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'院队德比', desc:'下一轮是兄弟学院之间的德比，赛前群聊里火药味渐浓。',
+   choices:[
+    {text:'和队友一起研究对手', effect:{ability:1, relation:2}, result:'你们认真研究对手，也更团结了。'},
+    {text:'在群里回应打气', effect:{relation:1, mentality:1}, result:'你的回应带动了院队气氛。'},
+    {text:'保持低调训练', effect:{ability:2}, result:'你没有参与口水战，专注自己的训练。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'学弟请教战术', desc:'一位院队学弟赛前来找你，想请教跑位和防守细节。',
+   choices:[
+    {text:'认真示范讲解', effect:{ability:1, relation:2}, result:'你讲解得很清楚，学弟收获很大。'},
+    {text:'简短提点几句', effect:{relation:1}, result:'你提点了几句，没有耽误自己训练。'},
+    {text:'让他先看录像', effect:{mentality:1}, result:'你让他先看录像，自己专心备战。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'新生球迷助威', desc:'几名新生球迷在训练场外为院队加油，希望和你聊两句。',
+   choices:[
+    {text:'认真回应加油', effect:{relation:2, mentality:1}, result:'你认真回应，新生们很开心。'},
+    {text:'简单打招呼', effect:{relation:1}, result:'你简单打了招呼，继续训练。'},
+    {text:'点头致意后离开', effect:{mentality:1}, result:'你礼貌点头，保持专注。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'战术录像课', desc:'教练临时安排战术录像课，要求全队分析下一轮对手。',
+   choices:[
+    {text:'认真做笔记', effect:{ability:1, academy:1}, result:'你的分析让教练很满意，下一场准备更充分。'},
+    {text:'拉着队友讨论', effect:{relation:2}, result:'你们讨论出几个针对性方案，关系也更近。'},
+    {text:'走神刷手机', effect:{mentality:-1}, result:'你走神刷手机，错过了重要布置。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'临时加练', desc:'队长提议下一场前加练一次，但训练强度不小。',
+   choices:[
+    {text:'参加加练', effect:{ability:2}, result:'你完成加练，脚下感觉更好了。'},
+    {text:'调整状态休息', effect:{mentality:1}, result:'你选择休息调整，避免过度疲劳。'},
+    {text:'练半场就走', effect:{ability:1, relation:1}, result:'你参加了一半，既表达了态度又保留了体力。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'队内聚餐', desc:'队友组织赛前聚餐，菜单很诱人。',
+   choices:[
+    {text:'一起聚餐', effect:{relation:2}, result:'聚餐让更衣室气氛更好，队友默契提升。'},
+    {text:'少吃并早退', effect:{relation:1, mentality:1}, result:'你参与了聚会，又保持了作息。'},
+    {text:'拒绝参加', effect:{relation:-1, mentality:1}, result:'你拒绝聚餐，专心准备比赛，但队友有些失望。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'雨战准备', desc:'天气预报显示下一场可能在大雨中进行。',
+   choices:[
+    {text:'提前适应湿滑场地', effect:{ability:1}, result:'你在湿滑场地加练，提前适应了比赛条件。'},
+    {text:'准备长钉鞋和护具', effect:{mentality:1, academy:1}, result:'你认真检查装备，比赛准备更加充分。'},
+    {text:'不放在心上', effect:{mentality:-1}, result:'你没有特别准备，比赛当天有些手忙脚乱。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'家人电话', desc:'赛前家人打来电话，希望和你多聊一会儿。',
+   choices:[
+    {text:'认真陪家人聊', effect:{mentality:2, academy:1}, result:'你陪家人聊完，心里踏实了不少。'},
+    {text:'简短报平安', effect:{mentality:1}, result:'你简短报了平安，继续准备比赛。'},
+    {text:'先挂断再说', effect:{mentality:-2}, result:'你匆匆挂断电话，心里有些不安。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'研究下个对手', desc:'下一轮对手的比赛录像已经拿到，你有半天自由时间。',
+   choices:[
+    {text:'逐帧分析录像', effect:{ability:2, academy:1}, result:'你找到对手的弱点，下一场更有把握。'},
+    {text:'只看集锦', effect:{ability:1}, result:'你大致了解对手风格，但细节不够。'},
+    {text:'放松休息', effect:{mentality:1}, result:'你选择休息，把状态留到比赛当天。'}]
+  },
+  {tag:'赛事间歇 · 抉择', title:'赛前恢复', desc:'队医建议你赛前进行一次恢复治疗。',
+   choices:[
+    {text:'接受完整恢复', effect:{ability:1, mentality:1}, result:'你的身体状态恢复得很好。'},
+    {text:'自己简单拉伸', effect:{ability:1}, result:'你做了简单拉伸，状态尚可。'},
+    {text:'不用了', effect:{mentality:-1}, result:'你忽略队医建议，比赛时有些疲惫。'}]
+  }
+];
+
 function rollEasterEgg(){
   const r = Math.random();
   if(r < 0.05) return EASTER_EVENTS[0];
@@ -1753,6 +1834,53 @@ function showEasterEgg(ev, onDone){
       checkAchievements(state);
       box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}<div class="result">离别时，你祝愿中国队早日进入世界杯，${ev.name || '学长'}对你笑了笑，对你说“一定会的”。</div><button class="btn" id="easterNext">继续</button>`;
       $('easterNext').onclick = onDone;
+    };
+    box.appendChild(btn);
+  });
+}
+
+function hasUpcomingPlayerMatch(){
+  const t = tourney;
+  if(!t) return false;
+  if(t.stage === 'group') return myMatchesLeft().length > 0;
+  if(t.stage === 'knockout') return t.currentMatch && t.currentMatch.winner === state.team.name;
+  if(typeof t.stage === 'string' && t.stage.startsWith('super')){
+    return t.superRound === 0 && t.currentMatch && t.currentMatch.winner === state.team.name;
+  }
+  return false;
+}
+
+function rollBetweenMatchEvent(){
+  return Math.random() < 0.35 ? pick(BETWEEN_MATCH_EVENTS) : null;
+}
+
+function showBetweenMatchEvent(ev, onDone){
+  show('scr-event');
+  $('evNum').textContent = state.number;
+  $('evName').textContent = state.name;
+  $('evCaptain').style.display = state.isCaptain ? 'inline-block' : 'none';
+  $('evReferee').style.display = state.flags.referee ? 'inline-block' : 'none';
+  $('evMeta').textContent = `${state.team.name} · ${state.league} · ${state.position}${state.flags.referee ? ' · ' + refereeLevelName(state) : ''}`;
+  $('evYear').textContent = yearName(state.year, state.path);
+  $('evStats').innerHTML = statBarHTML();
+  $('evMilestones').innerHTML = milestonesHTML();
+  $('evTag').textContent = ev.tag;
+  $('evTitle').textContent = ev.title;
+  $('evDesc').textContent = ev.desc;
+  const box = $('evChoices'); box.innerHTML = '';
+  ev.choices.forEach(c=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.textContent = c.text;
+    btn.onclick = ()=>{
+      addLog(`${ev.title}：${c.text}`);
+      let eff = c.effect || {};
+      let result = c.result || '';
+      if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
+      const actual = applyStats(eff);
+      checkAchievements(state);
+      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}<button class="btn" id="betweenNext">继续</button>`;
+      $('betweenNext').onclick = onDone;
     };
     box.appendChild(btn);
   });
@@ -1859,6 +1987,7 @@ function launchTournament(type, role, onDone){
     medicalRep: state.medical && state.flags.medicalSplit && type !== '新生杯',
     easterEgg: type === '华工杯' ? rollEasterEgg() : null,
     easterEggShown: false,
+    interEventShown: false,
     myGroup: groups.find(g => g.teams.includes(state.team.name)),
     playerGoals: 0, playerAssists: 0,
     playerYellows: 0,
@@ -2371,6 +2500,14 @@ function finishMatch(){
       t.easterEggShown = true;
       showEasterEgg(t.easterEgg, continueMatch);
     } else {
+      if(!t.interEventShown && hasUpcomingPlayerMatch()){
+        t.interEventShown = true;
+        const inter = rollBetweenMatchEvent();
+        if(inter){
+          showBetweenMatchEvent(inter, continueMatch);
+          return;
+        }
+      }
       continueMatch();
     }
   };
