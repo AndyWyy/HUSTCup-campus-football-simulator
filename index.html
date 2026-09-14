@@ -338,7 +338,7 @@
   <!-- 选择学院 -->
   <div class="screen" id="scr-college">
     <h2>选择你的学院</h2>
-    <p class="muted">从全部学院中选择一个加入。学院名称、队徽和分组都会显示在下方。标注「同济组」的学院属于华中科技大学同济医学院（Tongji Medical College of HUST），参加华工杯同济医学院组；其中基础医学院为五年制，需要在大三完成医学分流，分流去向只有基础医学院、第一临床学院和第二临床学院。</p>
+    <p class="muted">从全部学院中选择一个加入。学院名称、队徽和分组都会显示在下方。标注「同济组」的学院属于华中科技大学同济医学院（Tongji Medical College of HUST），参加华工杯同济医学院组。基础医学院需要在大三完成医学分流，分流去向只有基础医学院、第一临床学院和第二临床学院；药学院在开学后进行专业分流，可选药学（四年制）或临床药学（五年制）。</p>
     <div class="collegegrid" id="collegeGrid"></div>
     <p class="kicker" id="collegePreview">请选择你要加入的学院</p>
     <div class="spacer"></div>
@@ -661,7 +661,8 @@ const state = {
           kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
-          wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false },
+          wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
+          pharmacyTrack:'' },
   achievements:{},
   achievementClaimed:false,
   achievementPromptShown:false,
@@ -1269,6 +1270,30 @@ function medicalStreamEvent(s){
         s.flags.medicalSplit = true;
         s.medical = true;
         s.tongji = true;
+        return {};
+      }
+    }))
+  };
+}
+
+/* ---------------- 药学院专业分流（大一） ---------------- */
+/* 药学院在开学时分流为药学与临床药学，两者只有学制不同。 */
+const PHARMACY_TRACKS = [
+  { name:'药学',    fiveYear:false, note:'四年制 · 大四触发升学抉择与毕业杯' },
+  { name:'临床药学', fiveYear:true,  note:'五年制 · 医学大五触发升学抉择与毕业杯' }
+];
+function pharmacyTrackEvent(s){
+  if(!s.team || s.team.name !== '药学院' || s.flags.pharmacyTrack) return null;
+  return {tag:'药学 · 专业分流', title:'药学专业分流', auto:false,
+    desc:'药学院新生开学后进行专业分流，你需要在药学与临床药学之间做出选择。两者只有学制不同：药学为四年制，大四触发升学抉择与毕业杯；临床药学为五年制，医学大五才触发升学抉择与毕业杯。',
+    choices: PHARMACY_TRACKS.map(t=>({
+      text:t.name, warn:t.note, effect:{},
+      result: t.fiveYear
+        ? '你选择临床药学专业。本科五年制，将在医学大五迎来升学抉择与毕业杯。'
+        : '你选择药学专业。本科四年制，大四就会迎来升学抉择与毕业杯。',
+      resolve:s=>{
+        s.medical = t.fiveYear;
+        s.flags.pharmacyTrack = t.name;
         return {};
       }
     }))
@@ -3772,6 +3797,7 @@ function totalYears(path){
 function milestonesHTML(){
   const m = [];
   m.push(['入学','加入'+state.team.name]);
+  if(state.flags.pharmacyTrack) m.push(['专业', state.flags.pharmacyTrack + '（' + (state.medical ? '五年制' : '四年制') + '）']);
   if(state.year>=1) m.push(['大一','新生杯首秀']);
   if(state.flags.wasCaptain) m.push(['大二','当选队长']);
   if(state.flags.varsity) m.push(['校队','入选校队']);
@@ -3948,7 +3974,8 @@ function assignTeam(chosenGroup, chosenName){
                   kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
-                  wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false };
+                  wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
+                  pharmacyTrack:'' };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
   state.flags.medicalDirect = medicalDirect;
   if(medicalDirect) state.flags.medicalSplit = true;
@@ -3957,7 +3984,12 @@ function assignTeam(chosenGroup, chosenName){
   const tier = potentialTier(state.potential);
   addLog('被分配至「'+state.team.name+'」', '入学');
   addLog('球探报告：天赋 '+tier.label+'（'+tier.grade+'级）', '入学');
-  if(state.tongji) addLog(`同济医学院组 · 本科${state.medical ? '五年制' : '四年制'}${medicalDirect ? '' : '，大三进行医学分流'}`, '入学');
+  if(state.tongji){
+    const yearNote = name === '药学院'
+      ? '本科四年制或五年制，开学分流后确定'
+      : '本科' + (state.medical ? '五年制' : '四年制');
+    addLog(`同济医学院组 · ${yearNote}${medicalDirect ? '' : '，大三进行医学分流'}`, '入学');
+  }
 
   renderTeam('teamReveal');
   $('scoutReport').innerHTML = `
@@ -4063,6 +4095,9 @@ function startYear(){
   }
   if(capMs) seq.push({ type:'event', ev: capMs });
   if(ms && !isEnd) seq.push({ type:'event', ev: ms });
+  // 药学院：开学后进行药学 / 临床药学专业分流
+  const pharmEv = pharmacyTrackEvent(state);
+  if(pharmEv) seq.push({ type:'event', ev: pharmEv });
   if(year === 0){
     seq.push({ type:'supercup-preview', cond: superCupFreshmanEligible });
   }
