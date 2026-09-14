@@ -1296,28 +1296,29 @@ const PHARMACY_TRACKS = [
    1. 学业类事件出现率比同济组基准高 10%
    2. 涉及学业变动的事件选项成功率降低 5%
    3. 升学抉择时保研（外校 / 本校）成功率提升 20%
-   4. 学业值低于 60 时，每次事件抉择额外 心态 -1
+   4. 学业值低于 55 时，每次事件抉择额外 心态 -1
    5. 心态值低于 30 时触发坏结局「空中飞人」，直接结束生涯
    6. 学业值低于 60 时，学业类事件出现率提升 20%
-   7. 学业值低于 60 时，涉及学业变动的事件选项成功率提升 10% */
+   7. 学业值低于 60 时，涉及学业变动的事件选项成功率提升 25%（上限 100%） */
 const BIO_PHARMACY = '生物药学';
 const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.30;   // 学业类事件权重倍率（按实测占比校准到比同济组 +10%）
 const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.95;    // 学业变动选项成功率倍率
 const BIO_PHARMACY_BAOYAN_SCALE = 1.2;          // 保研成功率倍率
 const BIO_PHARMACY_LOW_ACADEMY = 60;            // 学业值警戒线
+const BIO_PHARMACY_DRAIN_ACADEMY = 55;          // 触发额外扣心态的学业值线
 const BIO_PHARMACY_LOW_ACADEMY_DRAIN = -1;      // 每次事件抉择额外扣除的心态
 const BIO_PHARMACY_BREAKDOWN_MENTALITY = 30;    // 心态崩溃线
-const BIO_PHARMACY_LOW_ACADEMY_TIP = '由于学业值低于 60，心态额外 -1';
+const BIO_PHARMACY_LOW_ACADEMY_TIP = '由于学业值低于 55，心态额外 -1';
 const BIO_PHARMACY_LOW_ACADEMY_EVENT_SCALE = 1.88;   // 低学业时学业类事件权重倍率（按实测占比校准到 +20%）
-const BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE = 1.1;      // 低学业时学业变动选项成功率倍率
+const BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE = 1.25;     // 低学业时学业变动选项成功率倍率（上限 100%）
 function isBioPharmacy(s){
   const t = s || state;
   return !!(t.flags && t.flags.pharmacyTrack === BIO_PHARMACY);
 }
-/* 学业值低于 60 时，每次事件抉择额外扣心态；返回是否触发 */
+/* 学业值低于 55 时，每次事件抉择额外扣心态；返回是否触发 */
 function bioPharmacyChoiceDrain(){
   if(!isBioPharmacy()) return false;
-  if(state.stats.academy >= BIO_PHARMACY_LOW_ACADEMY) return false;
+  if(state.stats.academy >= BIO_PHARMACY_DRAIN_ACADEMY) return false;
   state.stats.mentality = clamp(state.stats.mentality + BIO_PHARMACY_LOW_ACADEMY_DRAIN);
   return true;
 }
@@ -4347,9 +4348,9 @@ function choiceRollParams(c){
   let p = c.fixed ? (c.prob ?? 0.7) : (c.probFn ? clamp(c.probFn(state), 0.05, 0.95) : clamp((c.prob ?? 0.7) + (sv - 60) * 0.006, 0.12, 0.95));
   // 生物药学：涉及学业变动的事件选项成功率降低 5%（隐藏特性）
   if(isBioPharmacy() && touchesAcademy(c)) p = clamp(p * BIO_PHARMACY_CHOICE_PROB_SCALE, 0.05, 0.95);
-  // 生物药学：学业值低于 60 时，学业变动选项成功率提升 10%（隐藏特性）
+  // 生物药学：学业值低于 60 时，学业变动选项成功率提升 25%，上限 100%（隐藏特性）
   if(isBioPharmacy() && touchesAcademy(c) && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
-    p = clamp(p * BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE, 0.05, 0.95);
+    p = Math.min(p * BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE, 1);
   }
   const scale = c.fixed ? 1 : 0.8 + sv/100 * 0.7;   // 裁判班使用固定概率与固定效果；普通事件仍与基础数值关联
   return { p, scale };
