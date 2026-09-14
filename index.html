@@ -519,6 +519,24 @@ const TIER_LABEL = ['T0 · 王者之师','T1 · 一流劲旅','T2 · 中坚力�
 function teamTier(teamName){ return TIERS[teamName] ?? 2; }
 function teamBaseStrength(teamName){ return TIER_BASE[teamTier(teamName)]; }
 
+function weightedPickByTier(teams){
+  const weights = [30, 25, 20, 15, 10];
+  const total = teams.reduce((sum, name) => sum + (weights[teamTier(name)] || 10), 0);
+  let roll = Math.random() * total;
+  for(const name of teams){
+    roll -= weights[teamTier(name)] || 10;
+    if(roll <= 0) return name;
+  }
+  return teams[teams.length - 1];
+}
+
+function initialSeasonChampions(){
+  const jia = weightedPickByTier(GROUPS['甲组']);
+  const yi = weightedPickByTier(GROUPS['甲组'].filter(name => name !== jia));
+  const tongji = weightedPickByTier(GROUPS['同济组']);
+  return { jia, yi, tongji };
+}
+
 /* 计算某队本场强度：基础强度 + 状态浮动；若为玩家球队，额外叠加玩家四维表现贡献 */
 function teamStrength(teamName){
   const base = TIER_BASE[teamTier(teamName)];
@@ -589,12 +607,14 @@ const state = {
   militaryYearsCompleted:0,
   militaryYearsRemaining:0,
   medical:false,
+  seasonChampions:null,
   cupSeasonCount:0,
   championColleges:{},
   flags:{ bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
           kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
-          xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false },
+          xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
+          wentToField:false, superCupChampion:false },
   achievements:{},
   showChoiceDetails:false,
   repeatYear:false,
@@ -652,8 +672,9 @@ const ACHIEVEMENTS = [
   {id:'fan_favorite', icon:'🐦', name:'校园顶流', desc:'校内球迷关注度达到 80', check:s=>s.media.fans>=80},
   {id:'official_recognition', icon:'📢', name:'官方认可', desc:'HUSTFootball 关注度达到 80', check:s=>s.media.officials>=80},
   {id:'highest_mountain_longest_river', icon:'🏔️', name:'最高的山、最长的河', desc:'完成13年最长生涯，且每个学年都有华工杯出战纪录', check:s=>s.path==='读博' && (baseTotalYears(s.path) + (s.flags.militaryServed ? 2 : 0) + (s.flags.transferExtended ? 1 : 0)) === 13 && s.cupSeasonCount>=baseTotalYears(s.path)},
-  {id:'grand_slam', icon:'👑', name:'全满贯', desc:'夺得新生杯、华工杯乙组、华工杯甲组、毕业杯冠军', check:s=>s.flags.xinshengChampion && s.flags.yiChampion && s.flags.jiaChampion && s.flags.biyeChampion},
+  {id:'grand_slam', icon:'👑', name:'全满贯', desc:'夺得新生杯、华工杯乙组、华工杯甲组、毕业杯和超级杯冠军', check:s=>s.flags.xinshengChampion && s.flags.yiChampion && s.flags.jiaChampion && s.flags.biyeChampion && s.flags.superCupChampion},
   {id:'dual_college_legend', icon:'🏛️', name:'双院名宿', desc:'代表至少两个不同学院分别夺得杯赛冠军', check:s=>Object.keys(s.championColleges || {}).length>=2},
+  {id:'highest_honor', icon:'🏆', name:'最高荣誉', desc:'夺得超级杯冠军', check:s=>s.flags.superCupChampion},
   {id:'referee_path', icon:'🟨', name:'黑衣初亮相', desc:'加入足球协会成为裁判员', check:s=>s.flags.referee},
   {id:'referee_level2', icon:'🟧', name:'二级裁判', desc:'通过二级裁判员培训', check:s=>s.refereeLevel>=2},
   {id:'referee_level1', icon:'🟥', name:'一级裁判', desc:'通过一级裁判员培训', check:s=>s.flags.refereeL1Passed},
@@ -1010,6 +1031,7 @@ function milestoneEvent(year, s){
     desc:`你拖着行李箱走进华中科技大学，成为${s.team && s.team.name ? s.team.name : '你所在学院'}的新生。宿舍楼后的绿茵场上，新生杯的报名海报已经贴得满满当当。`,
     choices:[
       {text:'去球场会会队友', effect:{}, result:'', resolve:s=>{
+          s.flags.wentToField = true;
           const p = statProb({relation:0.005, perf:0.004}, 0.55)(s);
           if(Math.random() < p){ return {effect:{relation:3, mentality:1}, result:'你在球场上迅速和院队师兄们打成一片，人还没正式报到，先混了个脸熟。'}; }
           return {effect:{mentality:-1}, result:'场上的人比你想的强太多，你被压得有些喘不过气，但也看清了差距。'};
@@ -1635,6 +1657,126 @@ function isKnockoutMatch(match){
   return match && (match.stage === 'knockout' || match.isKey);
 }
 
+function simulateLeagueCup(league){
+  const teams = state.rosters[league].slice();
+  const groups = groupTeams(teams, groupSizesFor('华工杯', league));
+  groups.forEach(g => { g.matches = simulateGroupMatches(g, null); });
+  const perGroup = league === '甲组' ? 4 : 2;
+  let matches = buildBracket(groups, perGroup).map(m => ({ home:m.home, away:m.away, hg:null, ag:null, winner:null }));
+  while(matches.length > 1){
+    matches.forEach(m => {
+      const s = simulateBaseScore(teamStrength(m.home), teamStrength(m.away));
+      m.hg = s.a; m.ag = s.b;
+      m.winner = m.hg > m.ag ? m.home : (m.ag > m.hg ? m.away : (penaltyShootout(teamStrength(m.home), teamStrength(m.away)).win ? m.home : m.away));
+    });
+    const next = [];
+    for(let i = 0; i < matches.length; i += 2){
+      next.push({ home: matches[i] ? matches[i].winner : null, away: matches[i + 1] ? matches[i + 1].winner : null, hg:null, ag:null, winner:null });
+    }
+    matches = next;
+  }
+  const final = matches[0];
+  const s = simulateBaseScore(teamStrength(final.home), teamStrength(final.away));
+  final.hg = s.a; final.ag = s.b;
+  final.winner = final.hg > final.ag ? final.home : (final.ag > final.hg ? final.away : (penaltyShootout(teamStrength(final.home), teamStrength(final.away)).win ? final.home : final.away));
+  return final.winner;
+}
+
+function superCupFreshmanEligible(s){
+  if(!s.flags.wentToField) return false;
+  if(s.medical && !s.flags.medicalSplit) return false;
+  const c = s.seasonChampions;
+  if(!c || ![c.jia, c.yi, c.tongji].includes(s.team.name)) return false;
+  const grade = potentialTier(s.potential).grade;
+  const p = grade === 'S' ? 0.45 : (grade === 'A' ? 0.30 : 0);
+  return Math.random() < p;
+}
+
+function simulateSuperMatch(home, away){
+  const s = simulateBaseScore(teamStrength(home), teamStrength(away));
+  if(s.a === s.b){
+    return penaltyShootout(teamStrength(home), teamStrength(away)).win ? home : away;
+  }
+  return s.a > s.b ? home : away;
+}
+
+function launchSuperCup(preview){
+  const c = state.seasonChampions;
+  const myName = state.team.name;
+  const myRound = (myName === c.yi || myName === c.tongji) ? 0 : (myName === c.jia ? 1 : -1);
+  tourney = {
+    type:'超级杯', role:'player', league:'超级杯', minuteCap:80,
+    stage: myRound === 0 ? 'super_first' : (myRound === 1 ? 'super_final' : 'super_auto'),
+    roundLabel: myRound === 0 ? '超级杯 · 第一场' : '超级杯 · 决赛',
+    superRound: myRound,
+    superPreview: preview,
+    first: { home:c.yi, away:c.tongji },
+    final: { home:null, away:c.jia },
+    playerGoals:0, playerYellows:0
+  };
+
+  if(myRound === -1){
+    const first = simulateSuperMatch(c.yi, c.tongji);
+    const champion = simulateSuperMatch(first, c.jia);
+    finishSuperCup(champion);
+    return;
+  }
+  if(myRound === 1){
+    const first = simulateSuperMatch(c.yi, c.tongji);
+    tourney.final.home = first;
+    tourney.roundLabel = '超级杯 · 决赛';
+    renderMatchModeChoice({ home:first, away:c.jia }, true);
+    return;
+  }
+  tourney.roundLabel = '超级杯 · 第一场';
+  renderMatchModeChoice({ home:c.yi, away:c.tongji }, true);
+}
+
+function afterSuperMatch(){
+  const t = tourney;
+  const c = state.seasonChampions;
+  const myName = state.team.name;
+  if(t.superRound === 0){
+    const firstWinner = t.currentMatch.winner;
+    if(firstWinner === myName){
+      t.superRound = 1;
+      t.stage = 'super_final';
+      t.roundLabel = '超级杯 · 决赛';
+      renderMatchModeChoice({ home:myName, away:c.jia }, true);
+    } else {
+      const champion = simulateSuperMatch(firstWinner, c.jia);
+      finishSuperCup(champion);
+    }
+    return;
+  }
+  finishSuperCup(t.currentMatch.winner);
+}
+
+function finishSuperCup(champion){
+  const t = tourney;
+  const myName = state.team.name;
+  const playerWon = champion === myName && t.superRound >= 0;
+  let eff = {};
+  if(playerWon){
+    state.flags.superCupChampion = true;
+    state.championColleges[state.team.name] = true;
+    eff = { mentality:5, relation:5, ability:1 };
+    applyStats(eff);
+    checkAchievements(state);
+    postMedia('fans', `${state.name} 率队夺得超级杯冠军，球迷群彻底沸腾！`, {fans:12});
+    postMedia('officials', `HUSTFootball：${state.name} 代表 ${state.team.name} 夺得超级杯冠军！`, {officials:10});
+  } else {
+    postMedia('fans', `超级杯决赛结束，${champion} 捧起冠军奖杯。`, {fans:3});
+    postMedia('officials', `HUSTFootball：${champion} 获得本赛季超级杯冠军。`, {officials:4});
+  }
+  show('scr-match');
+  $('mStats').innerHTML = statBarHTML();
+  $('mHeader').innerHTML = `<div class="sectitle">超级杯 · 赛事收官</div><div class="m-title">${champion} 夺冠</div>`;
+  $('mBody').innerHTML = `<div class="result">${playerWon ? `你们捧起了超级杯冠军奖杯！` : `${champion} 获得超级杯冠军。`}</div>${eff && Object.keys(eff).length ? `<div class="delta">${effectText(eff)}</div>` : ''}`;
+  $('mActions').innerHTML = `<button class="btn gold" id="mBtn1">继续</button>`;
+  $('mBtn1').onclick = ()=>{ tourney = null; processQueue(); };
+}
+
 /* 启动一场赛事 */
 function launchTournament(type, role, onDone){
   let league = state.league;
@@ -1876,6 +2018,7 @@ function roundNameFor(koIdx){
 
 function matchStageLabel(){
   const t = tourney;
+  if(typeof t.stage === 'string' && t.stage.startsWith('super')) return t.roundLabel || '超级杯';
   if(t.stage === 'relegation') return '保级附加赛';
   if(t.stage === 'knockout') return roundNameFor(t.koRoundIdx);
   return '小组赛';
@@ -1978,7 +2121,8 @@ function renderMatchKeyEvent(){
   $('mStats').innerHTML = statBarHTML();
   $('mActions').innerHTML = '';   // 比赛进行中清空底部按键，避免上一屏「进入淘汰赛/开始小组赛」等残留按钮被误点导致事件重置
   const myName = state.team.name, opp = t.matchOpponent;
-  const stage = t.stage === 'relegation' ? '保级附加赛' : (t.isKey ? (t.stage === 'knockout' ? roundNameFor(t.koRoundIdx) : '生死战') : '小组赛');
+  const isSuperStage = typeof t.stage === 'string' && t.stage.startsWith('super');
+  const stage = isSuperStage ? (t.roundLabel || '超级杯') : (t.stage === 'relegation' ? '保级附加赛' : (t.isKey ? (t.stage === 'knockout' ? roundNameFor(t.koRoundIdx) : '生死战') : '小组赛'));
   $('mHeader').innerHTML = `
     <div class="sectitle">${t.type} · ${stage}</div>
     <div class="m-score"><span class="me">${myName}</span><b>VS</b><span>${opp}</span></div>
@@ -2111,7 +2255,8 @@ function finishMatch(){
   // 淘汰赛 / 保级附加赛 打平 → 点球
   let pen = null;
   let winner = null;
-  if((t.stage === 'knockout' || t.stage === 'relegation') && myGoals === oppGoals){
+  const isSuperStage = typeof t.stage === 'string' && t.stage.startsWith('super');
+  if((t.stage === 'knockout' || t.stage === 'relegation' || isSuperStage) && myGoals === oppGoals){
     const sA = teamStrength(m.home), sB = teamStrength(m.away);
     pen = penaltyShootout(sA, sB);
     winner = pen.win ? m.home : m.away;
@@ -2136,7 +2281,7 @@ function finishMatch(){
   // 展示比赛结果
   show('scr-match');
   const opp = t.matchOpponent;
-  const isKO = (t.stage === 'knockout' || t.stage === 'relegation');
+  const isKO = (t.stage === 'knockout' || t.stage === 'relegation' || isSuperStage);
   const won = isKO ? (winner === myName) : (myGoals > oppGoals);
   const lost = isKO ? (winner !== myName) : (myGoals < oppGoals);
   mediaAfterMatch(matchGoals, won, lost);
@@ -2146,7 +2291,7 @@ function finishMatch(){
     const myPenWin = (pen.win && t.matchMyHome) || (!pen.win && !t.matchMyHome);
     penText = `<div class="result" style="margin-top:8px;">常规时间 ${myGoals} : ${oppGoals} 战平，进入点球大战。${pen.took ? (pen.scored ? '你主罚的点球稳稳命中，' : '你主罚的点球遗憾罚失，') : ''}最终${myPenWin ? '你们' : '对方'}在点球大战中胜出。</div>`;
   }
-  const roundLabel = t.stage === 'relegation' ? '保级附加赛' : (t.isKey ? (t.knockoutRounds ? roundNameFor(t.koRoundIdx) : '淘汰赛') : '小组赛');
+  const roundLabel = isSuperStage ? (t.roundLabel || '超级杯') : (t.stage === 'relegation' ? '保级附加赛' : (t.isKey ? (t.knockoutRounds ? roundNameFor(t.koRoundIdx) : '淘汰赛') : '小组赛'));
   $('mHeader').innerHTML = `<div class="sectitle">${t.type} · ${roundLabel}</div><div class="m-title">${resTitle}</div>`;
   $('mBody').innerHTML = `
     <div class="m-score final"><span>${myName}</span><b>${myGoals} : ${oppGoals}</b><span>${opp}</span></div>
@@ -2158,6 +2303,7 @@ function finishMatch(){
   $('mBtn1').onclick = ()=>{
     if(t.stage === 'group'){ nextPlayerMatch(); }
     else if(t.stage === 'relegation'){ afterRelegationMatch(); }
+    else if(isSuperStage){ afterSuperMatch(); }
     else { afterKnockoutMatch(); }
   };
 }
@@ -2188,6 +2334,13 @@ function finishTournament(){
   const myName = state.team.name;
   if(t.type === '华工杯'){
     state.cupSeasonCount++;
+    state.seasonChampions = state.seasonChampions || initialSeasonChampions();
+    const lastRound = t.knockoutRounds ? t.knockoutRounds[t.knockoutRounds.length - 1] : null;
+    const ownChampion = lastRound && lastRound[0] ? lastRound[0].winner : null;
+    if(ownChampion) state.seasonChampions[t.league] = ownChampion;
+    ['甲组','乙组','同济组'].filter(league => league !== t.league).forEach(league => {
+      state.seasonChampions[league] = simulateLeagueCup(league);
+    });
   }
   let result = { rank: '小组未出线', title: `${t.type} 小组赛折戟`, eff: {mentality: -1}, prose: `你们在本届${t.type}中未能从小组赛出线，带着遗憾结束了征程。` };
 
@@ -3288,6 +3441,7 @@ function milestonesHTML(){
   if(state.flags.jiaChampion) m.push(['荣誉','华工杯甲组冠军']);
   if(state.flags.yiChampion) m.push(['荣誉','华工杯乙组冠军']);
   if(state.flags.tongjiChampion) m.push(['荣誉','医学球王']);
+  if(state.flags.superCupChampion) m.push(['荣誉','超级杯冠军']);
   if(state.flags.xinshengChampion) m.push(['荣誉','新生杯冠军']);
   if(state.flags.biyeChampion) m.push(['荣誉','毕业杯冠军']);
   if(state.flags.transferDone) m.push(['转专业','转入'+state.team.name]);
@@ -3423,6 +3577,7 @@ function assignTeam(chosenGroup, chosenName){
   state.league = state.team.group;
   state.rosters = { '甲组': GROUPS['甲组'].slice(), '乙组': GROUPS['乙组'].slice(), '同济组': GROUPS['同济组'].slice() };   // 动态升降级名单
   state.medical = group === '基础医学院';
+  state.seasonChampions = initialSeasonChampions();
   state.potential = randInt(30,95);
   state.stats.ability = randInt(60,80);
   state.stats.mentality = 60; state.stats.relation = 60; state.stats.academy = 60;
@@ -3447,7 +3602,8 @@ function assignTeam(chosenGroup, chosenName){
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
                   kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
-                  xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false };
+                  xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
+                  wentToField:false, superCupChampion:false };
   state.log = [];
 
   const tier = potentialTier(state.potential);
@@ -3537,11 +3693,17 @@ function startYear(){
 
   // 构建年度序列：开始里程碑 → 新生杯 → 常规(多) → 华工杯 → 常规(少)+随机 → 毕业杯 → 结束里程碑
   const seq = [];
+  if(year > 0){
+    seq.push({ type:'supercup' });
+  }
   if((year === 0 || year === 1) && !state.flags.militaryServed){
     seq.push({ type:'event', ev: militaryEvent(state) });
   }
   if(capMs) seq.push({ type:'event', ev: capMs });
   if(ms && !isEnd) seq.push({ type:'event', ev: ms });
+  if(year === 0){
+    seq.push({ type:'supercup-preview', cond: superCupFreshmanEligible });
+  }
   if(!state.flags.referee){
     const joinRef = refereeJoinEvent(state);
     if(joinRef) seq.push({ type:'event', ev: joinRef });
@@ -3596,6 +3758,11 @@ function processQueue(){
   if(queue.length === 0){ return yearEnd(); }
   const item = queue.shift();
   state.yearPlanDone++;
+  if(item.type === 'supercup' || item.type === 'supercup-preview'){
+    if(item.cond && !item.cond(state)){ return processQueue(); }
+    launchSuperCup(item.type === 'supercup-preview');
+    return;
+  }
   if(item.type === 'tourney'){
     if(item.cond && !item.cond(state)){ return processQueue(); }
     if(item.before) item.before();
