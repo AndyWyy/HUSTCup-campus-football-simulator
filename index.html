@@ -1099,9 +1099,11 @@ function weightedShuffle(list, weightFn){
   }
   return out;
 }
-/* 同济医学院组的学生课业更重，校园事件里更容易出现学业相关的选项 */
+/* 同济医学院组的学生课业更重，校园事件里更容易出现学业相关的选项；生物药学再高约 10% */
+const TONGJI_ACADEMIC_EVENT_WEIGHT = 3;
 function eventDrawWeight(ev){
-  return isTongjiPlayer() && hasAcademyBoost(ev) ? 3 : 1;
+  if(!isTongjiPlayer() || !hasAcademyBoost(ev)) return 1;
+  return TONGJI_ACADEMIC_EVENT_WEIGHT * (isBioPharmacy() ? BIO_PHARMACY_EVENT_WEIGHT_SCALE : 1);
 }
 /* 同济医学院组的学生从大二起不再考高数，改考系统解剖学，且判定成功率降低 20%（最低 5%） */
 const TONGJI_EXAM_EVENT_ID = 'fail_crisis';
@@ -1152,7 +1154,7 @@ function milestoneEvent(year, s){
     desc: s.medical ? '医学大五结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大四结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
       {text:'保研外校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
-          const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
+          const p = baoyanChance(s);   // 生物药学隐藏加成 +20%
           if(Math.random() < p){
             s.path='外校深造';
             return {effect:{academy:1}, result:'你获得了保研资格，并选择保送至外校深造。本科生涯结束后，你将去另一座城市续写青春。'};
@@ -1160,7 +1162,7 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-2}, result:'你没能获得外校保研资格，只能另寻出路（还可考虑保研本校、考研或直接就业）。'};
         }},
       {text:'保研本校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
-          const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
+          const p = baoyanChance(s);   // 生物药学隐藏加成 +20%
           if(Math.random() < p){
             s.path = Math.random()<0.5 ? '读研' : '直博';
             return {effect:{academy:1}, result:'你获得了保研资格，并选择留在华科继续深造。'};
@@ -1280,12 +1282,34 @@ function medicalStreamEvent(s){
 /* 药学院在开学时分流为药学与临床药学，两者只有学制不同。 */
 const PHARMACY_TRACKS = [
   { name:'药学',    fiveYear:false, note:'四年制 · 大四触发升学抉择与毕业杯' },
-  { name:'临床药学', fiveYear:true,  note:'五年制 · 医学大五触发升学抉择与毕业杯' }
+  { name:'临床药学', fiveYear:true,  note:'五年制 · 医学大五触发升学抉择与毕业杯' },
+  { name:'生物药学', fiveYear:false, note:'四年制 · 大四触发升学抉择与毕业杯' }
 ];
+/* 生物药学的隐藏特性（不在游戏文本中展示）：
+   1. 学业类事件出现率比同济组基准高 10%
+   2. 涉及学业变动的事件选项成功率降低 8%
+   3. 升学抉择时保研（外校 / 本校）成功率提升 20% */
+const BIO_PHARMACY = '生物药学';
+const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.43;   // 学业类事件权重倍率（按实测占比校准到 +10%）
+const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.92;    // 学业变动选项成功率倍率
+const BIO_PHARMACY_BAOYAN_SCALE = 1.2;          // 保研成功率倍率
+function isBioPharmacy(s){
+  const t = s || state;
+  return !!(t.flags && t.flags.pharmacyTrack === BIO_PHARMACY);
+}
+/* 选项是否涉及学业值变动 */
+function touchesAcademy(c){
+  return ['good','bad','effect'].some(k => c[k] && c[k].academy);
+}
+/* 保研成功率：学业 85 时 25%，学业 90 时 100%；生物药学额外提升 20% */
+function baoyanChance(s){
+  const base = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
+  return isBioPharmacy(s) ? clamp(base * BIO_PHARMACY_BAOYAN_SCALE, 0, 1) : base;
+}
 function pharmacyTrackEvent(s){
   if(!s.team || s.team.name !== '药学院' || s.flags.pharmacyTrack) return null;
   return {tag:'药学 · 专业分流', title:'药学专业分流', auto:false,
-    desc:'药学院新生开学后进行专业分流，你需要在药学与临床药学之间做出选择。两者只有学制不同：药学为四年制，大四触发升学抉择与毕业杯；临床药学为五年制，医学大五才触发升学抉择与毕业杯。',
+    desc:'药学院新生开学后进行专业分流，你需要在药学、临床药学与生物药学之间做出选择。其中药学与生物药学为四年制，大四触发升学抉择与毕业杯；临床药学为五年制，医学大五才触发升学抉择与毕业杯。',
     choices: PHARMACY_TRACKS.map(t=>({
       text:t.name, warn:t.note, effect:{},
       result: t.fiveYear
@@ -4276,7 +4300,9 @@ function statProb(weights, base, min, max){
 function choiceRollParams(c){
   const key = c.stat || 'mentality';
   const sv = clamp(state.stats[key] ?? 60, 0, 100);
-  const p = c.fixed ? (c.prob ?? 0.7) : (c.probFn ? clamp(c.probFn(state), 0.05, 0.95) : clamp((c.prob ?? 0.7) + (sv - 60) * 0.006, 0.12, 0.95));
+  let p = c.fixed ? (c.prob ?? 0.7) : (c.probFn ? clamp(c.probFn(state), 0.05, 0.95) : clamp((c.prob ?? 0.7) + (sv - 60) * 0.006, 0.12, 0.95));
+  // 生物药学：涉及学业变动的事件选项成功率降低 8%（隐藏特性）
+  if(isBioPharmacy() && touchesAcademy(c)) p = clamp(p * BIO_PHARMACY_CHOICE_PROB_SCALE, 0.05, 0.95);
   const scale = c.fixed ? 1 : 0.8 + sv/100 * 0.7;   // 裁判班使用固定概率与固定效果；普通事件仍与基础数值关联
   return { p, scale };
 }
