@@ -1287,11 +1287,11 @@ const PHARMACY_TRACKS = [
 ];
 /* 生物药学的隐藏特性（不在游戏文本中展示）：
    1. 学业类事件出现率比同济组基准高 10%
-   2. 涉及学业变动的事件选项成功率降低 8%
+   2. 涉及学业变动的事件选项成功率降低 5%
    3. 升学抉择时保研（外校 / 本校）成功率提升 20% */
 const BIO_PHARMACY = '生物药学';
 const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.30;   // 学业类事件权重倍率（按实测占比校准到比同济组 +10%）
-const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.92;    // 学业变动选项成功率倍率
+const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.95;    // 学业变动选项成功率倍率
 const BIO_PHARMACY_BAOYAN_SCALE = 1.2;          // 保研成功率倍率
 function isBioPharmacy(s){
   const t = s || state;
@@ -4301,7 +4301,7 @@ function choiceRollParams(c){
   const key = c.stat || 'mentality';
   const sv = clamp(state.stats[key] ?? 60, 0, 100);
   let p = c.fixed ? (c.prob ?? 0.7) : (c.probFn ? clamp(c.probFn(state), 0.05, 0.95) : clamp((c.prob ?? 0.7) + (sv - 60) * 0.006, 0.12, 0.95));
-  // 生物药学：涉及学业变动的事件选项成功率降低 8%（隐藏特性）
+  // 生物药学：涉及学业变动的事件选项成功率降低 5%（隐藏特性）
   if(isBioPharmacy() && touchesAcademy(c)) p = clamp(p * BIO_PHARMACY_CHOICE_PROB_SCALE, 0.05, 0.95);
   const scale = c.fixed ? 1 : 0.8 + sv/100 * 0.7;   // 裁判班使用固定概率与固定效果；普通事件仍与基础数值关联
   return { p, scale };
