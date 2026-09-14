@@ -1356,6 +1356,23 @@ function randomSpecialEvents(s){
         {text:'认真准备材料', effect:{academy:1,mentality:1,relation:1}, result:'你认真准备评选材料，顺利获得国家奖学金。'},
         {text:'保持平常心', effect:{mentality:1}, result:'你没有过多分心，最终仍凭借扎实成绩获得提名。'}]});
   }
+  // 非赛事期间：知名职业对决熬夜看球
+  const NIGHT_MATCHES = [
+    {name:'国家德比', time:'半夜'},
+    {name:'双红会', time:'凌晨'},
+    {name:'曼市德比', time:'凌晨'},
+    {name:'伦敦德比', time:'半夜'}
+  ];
+  if(Math.random() < 0.22){
+    const match = pick(NIGHT_MATCHES);
+    list.push({tag:'非赛事期 · 熬夜看球', title:`熬夜看球 · ${match.name}`, auto:false,
+      desc:`${match.name}在${match.time}开打，正好最近球队没有比赛。你要不要熬夜观看？`,
+      choices:[
+        ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。'),
+        ch('只看半场', 0.75, 'mentality', {mentality:1}, {ability:-1}, '你只看半场后休息，既过了瘾又保留了状态。', '你没能忍住，还是看完了下半场。'),
+        ch('早点休息', 0.85, 'mentality', {academy:1, mentality:1}, {}, '你放弃看球，早早休息，保持了学习和训练状态。', '你心里一直惦记比赛，反而没睡好。')
+      ]});
+  }
   // 情伤失恋
   if(Math.random()<0.15){
     list.push({tag:'随机特殊事件', title:'情伤失恋', auto:false,
@@ -1796,6 +1813,15 @@ const BETWEEN_MATCH_EVENTS = [
     {text:'接受完整恢复', effect:{ability:1, mentality:1}, result:'你的身体状态恢复得很好。'},
     {text:'自己简单拉伸', effect:{ability:1}, result:'你做了简单拉伸，状态尚可。'},
     {text:'不用了', effect:{mentality:-1}, result:'你忽略队医建议，比赛时有些疲惫。'}]
+  },
+  {tag:'华工杯间歇 · 熬夜看球', title:'凌晨三点的欧冠', only:'华工杯', desc:'华工杯期间，凌晨三点有一场关键欧冠比赛。你要不要熬夜看完？',
+   choices:[
+    {text:'熬夜看完', effect:{}, result:'', resolve:s=>{
+      if(Math.random() < 0.55) return {effect:{ability:1, mentality:1}, result:'你熬夜看完整场，从高水平比赛中看出不少细节。'};
+      return {effect:{ability:-1, mentality:-1, academy:-1}, result:'你熬夜看球，第二天训练和上课都昏昏沉沉。'};
+    }},
+    {text:'只看半场', effect:{mentality:1}, result:'你只看半场后休息，既过了瘾又保留了状态。'},
+    {text:'早点休息', effect:{academy:1, mentality:1}, result:'你放弃看球，早早休息，保持了比赛状态。'}]
   }
 ];
 
@@ -1851,7 +1877,9 @@ function hasUpcomingPlayerMatch(){
 }
 
 function rollBetweenMatchEvent(){
-  return Math.random() < 0.35 ? pick(BETWEEN_MATCH_EVENTS) : null;
+  if(Math.random() >= 0.35) return null;
+  const pool = BETWEEN_MATCH_EVENTS.filter(e => !e.only || e.only === tourney.type);
+  return pool.length ? pick(pool) : null;
 }
 
 function showBetweenMatchEvent(ev, onDone){
