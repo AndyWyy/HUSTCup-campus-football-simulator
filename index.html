@@ -338,7 +338,7 @@
   <!-- 选择学院 -->
   <div class="screen" id="scr-college">
     <h2>选择你的学院</h2>
-    <p class="muted">从全部学院中选择一个加入。学院名称、队徽和甲组/乙组分组都会显示在下方。</p>
+    <p class="muted">从全部学院中选择一个加入。学院名称、队徽和分组都会显示在下方。标注「同济组」的学院属于华中科技大学同济医学院（Tongji Medical College of HUST），参加华工杯同济医学院组；其中基础医学院为五年制，需要在大三完成医学分流，分流去向只有基础医学院、第一临床学院和第二临床学院。</p>
     <div class="collegegrid" id="collegeGrid"></div>
     <p class="kicker" id="collegePreview">请选择你要加入的学院</p>
     <div class="spacer"></div>
@@ -349,7 +349,7 @@
   <div class="screen" id="scr-medical-stream">
     <div class="topbar"><span class="brand">⚽ 华工杯 · 校园足球模拟器</span></div>
     <h2>医学分流</h2>
-    <p class="muted">大二学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。学业不足的选项会显示为灰色。</p>
+    <p class="muted">大三学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。分流去向只有基础医学院、第一临床学院和第二临床学院三个选项，学业不足的选项会显示为灰色。</p>
     <div class="panel" id="medicalStreamStats"></div>
     <div class="collegegrid" id="medicalStreamGrid"></div>
     <div class="result" id="medicalStreamResult" style="display:none;"></div>
@@ -537,6 +537,32 @@ const TIER_LABEL = ['T0 · 王者之师','T1 · 一流劲旅','T2 · 中坚力�
 function teamTier(teamName){ return TIERS[teamName] ?? 2; }
 function teamBaseStrength(teamName){ return TIER_BASE[teamTier(teamName)]; }
 
+/* ---------------- 医学类学院（同济医学院组）规则 ---------------- */
+/* 开局可选的医学类学院（均属同济组）：基础医学院需要在大三分流，其余医学类专业开局即可直接选择。 */
+const MEDICAL_ENTRY_COLLEGES = ['法医学系','公共卫生学院','护理学院','基础医学院','药学院','医药卫生管理学院'];
+/* 护理学院、医药卫生管理学院、药学院：同属同济组，但本科四年制，没有医学大五 */
+const FOUR_YEAR_MEDICAL_COLLEGES = ['护理学院','医药卫生管理学院','药学院'];
+/* 基础医学院大三的分流去向 */
+const MEDICAL_STREAM_COLLEGES = [
+  { name:'第一临床学院', req:85 },
+  { name:'第二临床学院', req:80 },
+  { name:'基础医学院', req:0 }
+];
+/* 同济医学院组（华工杯同济医学院组）成员 */
+const isTongjiCollege = name => GROUPS['同济组'].includes(name);
+/* 五年制医学类学院 */
+const isFiveYearMedicalCollege = name => isTongjiCollege(name) && !FOUR_YEAR_MEDICAL_COLLEGES.includes(name);
+
+/* 当前球员是否属于同济医学院组（旧存档没有 tongji 字段时回退到球队分组判断） */
+function isTongjiPlayer(){
+  return !!(state.tongji || (state.team && state.team.group === '同济组'));
+}
+
+/* 新生杯 / 毕业杯的主校区参赛名单：主校区 29 队 + 医学类 6 队 */
+function mainCampusCupTeams(){
+  return [...state.rosters['甲组'], ...state.rosters['乙组'], ...MEDICAL_ENTRY_COLLEGES];
+}
+
 function weightedPickByTier(teams){
   const weights = [30, 25, 20, 15, 10];
   const total = teams.reduce((sum, name) => sum + (weights[teamTier(name)] || 10), 0);
@@ -626,13 +652,15 @@ const state = {
   militaryYearsCompleted:0,
   militaryYearsRemaining:0,
   medical:false,
+  tongji:false,            // 是否属于同济医学院组（华工杯同济医学院组）
+  medicalCupAlias:false,   // 第一/第二临床学院在主校区赛事中以基础医学院名义出战时置为 true
   seasonChampions:null,
   cupSeasonCount:0,
   championColleges:{},
   flags:{ bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
           kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
-          xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
+          xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false },
   achievements:{},
   achievementClaimed:false,
@@ -1053,6 +1081,45 @@ const REGULAR_EVENTS = [
      ch('主动请教争议', 0.75, 'relation', {relation:2,mentality:1}, {relation:-1}, '学长欣赏你的好问，把你介绍给了更多裁判同行。', '你问题太多，学长有点不耐烦。')]}
 ];
 
+/* ---------------- 事件池调整（同济医学院组） ---------------- */
+/* 某个事件是否包含提升学业值的选项 */
+function hasAcademyBoost(ev){
+  return (ev.choices || []).some(c => (c.good && c.good.academy > 0) || (c.effect && c.effect.academy > 0));
+}
+/* 加权随机排序：权重越高越容易被抽中 */
+function weightedShuffle(list, weightFn){
+  const items = list.slice(), out = [];
+  while(items.length){
+    const weights = items.map(weightFn);
+    const total = weights.reduce((a,b)=>a+b, 0);
+    let roll = Math.random() * total, i = 0;
+    while(i < items.length - 1 && (roll -= weights[i]) > 0) i++;
+    out.push(items.splice(i, 1)[0]);
+  }
+  return out;
+}
+/* 同济医学院组的学生课业更重，校园事件里更容易出现学业相关的选项 */
+function eventDrawWeight(ev){
+  return isTongjiPlayer() && hasAcademyBoost(ev) ? 3 : 1;
+}
+/* 同济医学院组的学生从大二起不再考高数，改考系统解剖学，且判定成功率降低 20%（最低 5%） */
+const TONGJI_EXAM_EVENT_ID = 'fail_crisis';
+const TONGJI_EXAM_PROB_SCALE = 0.8;
+function adaptEventForPlayer(ev){
+  if(ev.id !== TONGJI_EXAM_EVENT_ID) return ev;
+  if(!isTongjiPlayer() || state.year < 1) return ev;
+  return {
+    ...ev,
+    title: '系统解剖学考试',
+    desc: ev.desc.replace(/高数/g, '系统解剖学'),
+    choices: ev.choices.map(c => ({
+      ...c,
+      prob: undefined,
+      probFn: s => clamp((c.probFn ? c.probFn(s) : (c.prob ?? 0.7)) * TONGJI_EXAM_PROB_SCALE, 0.05, 0.95)
+    }))
+  };
+}
+
 /* ---------------- 年度特殊事件（里程碑） ---------------- */
 function milestoneEvent(year, s){
   if(year===0) return {   // 大一开学：新生报到（在新生杯之前触发，保证「事件→比赛→事件」节奏）
@@ -1068,7 +1135,7 @@ function milestoneEvent(year, s){
       {text:'先熟悉校园', effect:{academy:1, mentality:2}, result:'你花时间摸清了教室、食堂和图书馆的位置，很快融入了大学生活。'},
       {text:'宅在宿舍歇着', effect:{academy:-2, mentality:1}, result:'你在宿舍窝了几天，错过了认识队友的机会，好在心情放松了不少。'}]
   };
-  if(year===1 && s.medical && !s.flags.medicalSplit) return medicalStreamEvent(s);
+  if(year===2 && s.medical && !s.flags.medicalSplit) return medicalStreamEvent(s);   // 大三完成医学分流
   if(year===1) return {
     tag:'大二 · 年度特殊事件', title:'队长竞选', auto:false,
     desc:'原队长毕业，队里开始竞选新队长。你是有力的候选人之一。',
@@ -1186,29 +1253,22 @@ function captainMilestone(year, s){
 /* ---------------- 医学分流 ---------------- */
 function medicalStreamEvent(s){
   if(!s.medical || s.flags.medicalSplit) return null;
-  const options = [
-    ['第一临床学院', 85],
-    ['第二临床学院', 80],
-    ['法医学系', 75],
-    ['药学院', 70],
-    ['公共卫生学院', 65],
-    ['医药卫生管理学院', 65],
-    ['护理学院', 60],
-    ['基础医学院', 0]
-  ];
   return {tag:'医学 · 年度特殊事件', title:'医学分流', auto:false, medicalStream:true,
-    desc:'大二学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习，并根据学业成绩分流。',
-    choices: options.map(([name, req])=>({
+    desc:'大三学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。分流去向为基础医学院、第一临床学院和第二临床学院，学业成绩决定你能进入哪一档。',
+    choices: MEDICAL_STREAM_COLLEGES.map(({name, req})=>({
       text: name,
       warn: req ? `需要学业值达到 ${req}` : '',
       cond: s=>s.stats.academy >= req,
       effect:{},
-      result:`你成功分流进入${name}，从本届华工杯开始代表该学院参加华工杯同济医学院（Tongji Medical College of HUST）组比赛。`,
+      result: name === '基础医学院'
+        ? '你选择留在基础医学院继续学业，之后仍代表基础医学院参加华工杯同济医学院（Tongji Medical College of HUST）组比赛。'
+        : `你成功分流进入${name}，从本届华工杯开始代表该学院参加华工杯同济医学院（Tongji Medical College of HUST）组比赛。`,
       resolve:s=>{
         s.team = { name, group:'同济组' };
         s.league = '同济组';
         s.flags.medicalSplit = true;
         s.medical = true;
+        s.tongji = true;
         return {};
       }
     }))
@@ -1260,6 +1320,7 @@ function assignTransferCollege(s, sophomore){
   s.league = group;
   s.isCaptain = false;
   s.medical = false;
+  s.tongji = false;
   s.flags.medicalSplit = false;
   s.flags.transferDone = true;
   if(sophomore){
@@ -1275,11 +1336,11 @@ function transferExamEvent(s){
   if((s.year !== 0 && s.year !== 1) || s.flags.transferAttempted) return null;
   const sophomore = s.year === 1;
   const base = sophomore ? 0.3 : 0.55;
-  const medical = !!s.medical;
+  const medical = !!s.tongji;
   return {tag:'转专业 · 学业事件', title:'转专业考试', auto:false,
     desc: sophomore
-      ? (medical ? '医学分流后，你可以通过转专业考试转入主校区普通学院，并降级到大一。' : '大二学年，学校开放转专业考试。大二报名者需要更高的学业水平，成功后转入新的学院，并降级到大一，直接以新身份参加本届华工杯。')
-      : (medical ? '基础医学院学生可以在大一通过转专业考试转入主校区普通学院。' : '新生杯结束后，学校开放转专业考试。大一报名者学业要求相对较低，成功后重新分配学院，并从本届华工杯开始启用新身份。'),
+      ? (medical ? '医学类学院的学生可以通过转专业考试转入主校区普通学院，并降级到大一。' : '大二学年，学校开放转专业考试。大二报名者需要更高的学业水平，成功后转入新的学院，并降级到大一，直接以新身份参加本届华工杯。')
+      : (medical ? '医学类学院的学生可以在大一通过转专业考试转入主校区普通学院。' : '新生杯结束后，学校开放转专业考试。大一报名者学业要求相对较低，成功后重新分配学院，并从本届华工杯开始启用新身份。'),
     choices:[
       {text:'报名参加转专业考试', flag:'transferAttempted', probFn:statProb({academy:0.012}, base, 0.05, 0.9), stat:'academy',
        good:{academy:1, mentality:2}, bad:{mentality:-2, academy:-1},
@@ -1638,7 +1699,7 @@ function groupSizesFor(type, league){
     if(league === '同济组') return [4,4];
     return league === '甲组' ? [6,6] : [4,4,4,5];
   }
-  return [4,4,4,4,4,4,3,3];   // 新生杯/毕业杯：主校区29队 + 基础医学院 = 30队
+  return [5,5,5,4,4,4,4,4];   // 新生杯/毕业杯：主校区 29 队 + 医学类 6 队 = 35 队（8 组，每组前 2 进 16 强）
 }
 function groupTeams(teams, sizes){
   const shuffled = shuffleArray(teams);
@@ -1920,7 +1981,8 @@ function hasUpcomingPlayerMatch(){
 function rollBetweenMatchEvent(){
   if(Math.random() >= 0.35) return null;
   const pool = BETWEEN_MATCH_EVENTS.filter(e => !e.only || e.only === tourney.type);
-  return pool.length ? pick(pool) : null;
+  if(!pool.length) return null;
+  return weightedShuffle(pool, eventDrawWeight)[0];
 }
 
 function showBetweenMatchEvent(ev, onDone){
@@ -2037,23 +2099,23 @@ function launchTournament(type, role, onDone){
   let league = state.league;
   let teams;
   if(type === '华工杯'){
-    if(state.medical && state.flags.medicalSplit){
+    if(isTongjiPlayer()){
       league = '同济组';
     }
     teams = state.rosters[league].slice();
   } else if(type === '毕业杯'){
     league = '毕业杯';
-    teams = [...state.rosters['甲组'], ...state.rosters['乙组'], '基础医学院'];
+    teams = mainCampusCupTeams();
   } else {
     league = '全部球队';
-    teams = [...state.rosters['甲组'], ...state.rosters['乙组'], '基础医学院'];
+    teams = mainCampusCupTeams();
   }
   const sizes = groupSizesFor(type, league);
   const groups = groupTeams(teams, sizes);
   groups.forEach(g => { g.matches = simulateGroupMatches(g, state.team.name); });
   tourney = {
     type, role, league, groups,
-    medicalRep: state.medical && state.flags.medicalSplit && type !== '新生杯',
+    medicalRep: !!state.medicalCupAlias,
     easterEgg: type === '华工杯' ? rollEasterEgg() : null,
     easterEggShown: false,
     interEventShown: false,
@@ -2082,9 +2144,10 @@ function renderMatchIntro(){
   $('mHeader').innerHTML = `
     <div class="sectitle">${t.type} · ${t.role === 'coach' ? '教练视角' : leagueLabel}</div>
     <div class="m-title">${t.type}</div>
-    <div class="m-sub">${t.type === '华工杯' ? (t.league === '同济组' ? 'Tongji Medical College of HUST · 8 队分 2 组 · 每组前 2 进半决赛 · 冠军获得医学球王荣誉' : (t.league === '甲组' ? '12 队 · 2 组单循环 · 每组前 4 进八强 · 末两名打保级附加赛' : '17 队 · 3×4队组+1×5队组 · 每组前 2 出线打八强')) : '30 队 · 8 组（6×4队+2×3队）· 每组前 2 出线进 16 强'}</div>`;
+    <div class="m-sub">${t.type === '华工杯' ? (t.league === '同济组' ? 'Tongji Medical College of HUST · 8 队分 2 组 · 每组前 2 进半决赛 · 冠军获得医学球王荣誉' : (t.league === '甲组' ? '12 队 · 2 组单循环 · 每组前 4 进八强 · 末两名打保级附加赛' : '17 队 · 3×4队组+1×5队组 · 每组前 2 出线打八强')) : '35 队 · 8 组（3×5队+5×4队）· 每组前 2 出线进 16 强'}</div>`;
   $('mBody').innerHTML = `<div class="m-group">${renderGroupBox(t.myGroup)}</div>
-    <div class="result" style="margin-top:12px;">${t.league === '同济组' ? '华工杯同济医学院（Tongji Medical College of HUST）组 8 队分两组，每组前 2 名出线，随后进行半决赛和决赛。冠军将获得“医学球王”荣誉。' : `你所在的 <b>${t.myGroup.name}</b> 共有 ${t.myGroup.teams.length} 支球队，单循环后前 2 名出线。`}每场小组赛你将做出 1-2 次关键抉择。</div>`;
+    <div class="result" style="margin-top:12px;">${t.league === '同济组' ? '华工杯同济医学院（Tongji Medical College of HUST）组 8 队分两组，每组前 2 名出线，随后进行半决赛和决赛。冠军将获得“医学球王”荣誉。' : `你所在的 <b>${t.myGroup.name}</b> 共有 ${t.myGroup.teams.length} 支球队，单循环后前 2 名出线。`}每场小组赛你将做出 1-2 次关键抉择。</div>
+    ${t.medicalRep ? `<div class="result" style="margin-top:8px;">第一临床学院和第二临床学院没有独立的主校区参赛身份，这项赛事以 <b>基础医学院</b> 的名义出战。</div>` : ''}`;
   $('mActions').innerHTML = `<button class="btn gold" id="mBtn1">开始小组赛</button>`;
   $('mBtn1').onclick = ()=>{ nextPlayerMatch(); };
 }
@@ -3720,7 +3783,8 @@ function milestonesHTML(){
   if(state.flags.biyeChampion) m.push(['荣誉','毕业杯冠军']);
   if(state.flags.transferDone) m.push(['转专业','转入'+state.team.name]);
   if(state.flags.transferExtended) m.push(['学籍','降级大一']);
-  if(state.flags.medicalSplit) m.push(['医学','医学院分流']);
+  if(state.flags.medicalDirect) m.push(['医学','医学类专业']);
+  else if(state.flags.medicalSplit) m.push(['医学','医学院分流']);
   if(state.league && state.league !== state.team.group){
     m.push([state.league==='甲组'?'升级':'降级', state.league==='甲组'?'升入甲组':'降至乙组']);
   }
@@ -3819,7 +3883,8 @@ function chooseCollege(){
   for(const group of ['甲组','乙组']){
     GROUPS[group].forEach(name => all.push({ name, group }));
   }
-  all.push({ name:'基础医学院', group:'基础医学院' });
+  // 医学类学院：均属同济组，基础医学院大三分流，其余专业开局即可直接选择
+  MEDICAL_ENTRY_COLLEGES.forEach(name => all.push({ name, group: '同济组' }));
   all.forEach(team=>{
     const btn = document.createElement('button');
     btn.className = 'college-item';
@@ -3850,7 +3915,10 @@ function assignTeam(chosenGroup, chosenName){
   state.team = { name, group };
   state.league = state.team.group;
   state.rosters = { '甲组': GROUPS['甲组'].slice(), '乙组': GROUPS['乙组'].slice(), '同济组': GROUPS['同济组'].slice() };   // 动态升降级名单
-  state.medical = group === '基础医学院';
+  // 医学类学院：参加华工杯同济医学院组；基础医学院与法医学系、公共卫生学院为五年制，护理学院、医药卫生管理学院、药学院为四年制
+  state.tongji = isTongjiCollege(name);
+  state.medical = isFiveYearMedicalCollege(name);
+  const medicalDirect = state.tongji && name !== '基础医学院';
   state.seasonChampions = initialSeasonChampions();
   state.calendarYear = 2026;
   state.potential = randInt(30,95);
@@ -3879,13 +3947,17 @@ function assignTeam(chosenGroup, chosenName){
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
                   kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
-                  xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
+                  xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false };
+  // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
+  state.flags.medicalDirect = medicalDirect;
+  if(medicalDirect) state.flags.medicalSplit = true;
   state.log = [];
 
   const tier = potentialTier(state.potential);
   addLog('被分配至「'+state.team.name+'」', '入学');
   addLog('球探报告：天赋 '+tier.label+'（'+tier.grade+'级）', '入学');
+  if(state.tongji) addLog(`同济医学院组 · 本科${state.medical ? '五年制' : '四年制'}${medicalDirect ? '' : '，大三进行医学分流'}`, '入学');
 
   renderTeam('teamReveal');
   $('scoutReport').innerHTML = `
@@ -3949,6 +4021,19 @@ function isEndMilestone(s){
   return false;                               // 新生杯、队长竞选等
 }
 
+/* 医学类学院在新生杯/毕业杯都直接以本学院名义参赛；
+   只有通过基础医学院分流进入的第一临床学院、第二临床学院没有主校区身份，需要以「基础医学院」名义出战。 */
+function needsMedicalHomeIdentity(){
+  return !!state.medical && state.team && !MEDICAL_ENTRY_COLLEGES.includes(state.team.name);
+}
+function medicalHomeIdentityHooks(){
+  let savedTeam = null;
+  return {
+    before:()=>{ savedTeam = state.team; state.team = { name:'基础医学院', group:'同济组' }; state.medicalCupAlias = true; },
+    after:()=>{ if(savedTeam){ state.team = savedTeam; state.league = savedTeam.group; } state.medicalCupAlias = false; }
+  };
+}
+
 function startYear(){
   state.repeatYear = false;
   queue = [];
@@ -3961,8 +4046,8 @@ function startYear(){
   const n = year < 4 ? 8 : 6;
   const nBefore = Math.round(n * 2 / 3);   // 本科 5 / 深造 4
   const nAfter = n - nBefore;              // 本科 3 / 深造 2
-  const pool = REGULAR_EVENTS.filter(e=>e.cond(state));
-  const shuffled = pool.sort(()=>Math.random()-0.5);
+  const pool = REGULAR_EVENTS.filter(e=>e.cond(state)).map(adaptEventForPlayer);
+  const shuffled = weightedShuffle(pool, eventDrawWeight);
   const regularBefore = shuffled.slice(0, nBefore).map(e=>({tag:'常规事件', ...e}));
   const regularAfter = shuffled.slice(nBefore, n).map(e=>({tag:'常规事件', ...e}));
   // 随机特殊事件
@@ -3990,7 +4075,9 @@ function startYear(){
     // 大一：新生报到后先穿插 2 个常规事件，再打新生杯
     const preCup = regularBefore.splice(0, Math.min(2, regularBefore.length));
     preCup.forEach(e => seq.push({ type:'event', ev: e }));
-    seq.push({ type:'tourney', tourney:'新生杯', role:'player' });
+    const xinshengCup = { type:'tourney', tourney:'新生杯', role:'player' };
+    if(needsMedicalHomeIdentity()) Object.assign(xinshengCup, medicalHomeIdentityHooks());
+    seq.push(xinshengCup);
   } else if(year >= 2){
     seq.push({ type:'tourney', tourney:'新生杯', role:'coach', cond: s => s.isCaptain });
   }
@@ -4012,15 +4099,9 @@ function startYear(){
   const undergradFinal = state.year === (state.medical ? 4 : 3);
   const gradFinal = year === academicYears(state.path, state) - 1;
   if(undergradFinal || gradFinal){
-    if(state.medical && state.flags.medicalSplit){
-      let savedTeam = state.team;
-      seq.push({ type:'tourney', tourney:'毕业杯', role:'player',
-        before:()=>{ savedTeam = state.team; state.team = { name:'基础医学院', group:'基础医学院' }; state.league='毕业杯'; },
-        after:()=>{ state.team = savedTeam; state.league = savedTeam.group === '同济组' ? '同济组' : savedTeam.group; }
-      });
-    } else {
-      seq.push({ type:'tourney', tourney:'毕业杯', role:'player' });
-    }
+    const biyeCup = { type:'tourney', tourney:'毕业杯', role:'player' };
+    if(needsMedicalHomeIdentity()) Object.assign(biyeCup, medicalHomeIdentityHooks());
+    seq.push(biyeCup);
   }
   // 结束型里程碑
   if(ms && isEnd) seq.push({ type:'event', ev: ms });
@@ -4401,7 +4482,7 @@ function setupAchievementClaim(){
     state.achievementClaimed = true;
     $('achClaimOverlay').classList.remove('show');
     const title = encodeURIComponent(`全成就玩家登记：${id}`);
-    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2\n达成时间：${new Date().toLocaleString('zh-CN')}`);
+    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2.1\n达成时间：${new Date().toLocaleString('zh-CN')}`);
     window.open(`https://github.com/Fantasicrap/HUSTCup-campus-football-simulator/issues/new?title=${title}&body=${body}&labels=full-achievement`, '_blank');
   };
   $('achClaimCancel').onclick = ()=>{
