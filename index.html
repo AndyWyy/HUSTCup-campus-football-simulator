@@ -1100,7 +1100,7 @@ function weightedShuffle(list, weightFn){
   return out;
 }
 /* 同济医学院组的学生课业更重，校园事件里更容易出现学业相关的选项；生物药学再高约 10% */
-const TONGJI_ACADEMIC_EVENT_WEIGHT = 3;
+const TONGJI_ACADEMIC_EVENT_WEIGHT = 1.6;
 function eventDrawWeight(ev){
   if(!isTongjiPlayer() || !hasAcademyBoost(ev)) return 1;
   return TONGJI_ACADEMIC_EVENT_WEIGHT * (isBioPharmacy() ? BIO_PHARMACY_EVENT_WEIGHT_SCALE : 1);
@@ -1290,7 +1290,7 @@ const PHARMACY_TRACKS = [
    2. 涉及学业变动的事件选项成功率降低 8%
    3. 升学抉择时保研（外校 / 本校）成功率提升 20% */
 const BIO_PHARMACY = '生物药学';
-const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.43;   // 学业类事件权重倍率（按实测占比校准到 +10%）
+const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.30;   // 学业类事件权重倍率（按实测占比校准到比同济组 +10%）
 const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.92;    // 学业变动选项成功率倍率
 const BIO_PHARMACY_BAOYAN_SCALE = 1.2;          // 保研成功率倍率
 function isBioPharmacy(s){
