@@ -1346,10 +1346,10 @@ function randomSpecialEvents(s){
       choices:[{text:'重新适应', effect:{academy:-3,mentality:-1}, result:'你换到了新方向，前期的积累付诸东流，只能咬牙重来。'}]});
   }
   // 深造期间：延毕 5%
-  if(inGrad(s) && Math.random()<0.05){
+  if(inGrad(s) && (s.extendedYears || 0) < 2 && Math.random()<0.05){
     list.push({tag:'深造 · 随机事件', title:'论文受阻 · 延毕', auto:true,
       desc:'论文进度严重滞后，你面临延毕一年。',
-      choices:[{text:'咬牙坚持', effect:{academy:-2,mentality:-2}, result:'你延毕了一年，将在下一学年继续当前培养阶段。', resolve:s=>{ s.flags.extendGraduation = true; s.extendedYears = (s.extendedYears || 0) + 1; return {}; }}]});
+      choices:[{text:'咬牙坚持', effect:{academy:-2,mentality:-2}, result:'你延毕了一年，将在下一学年继续当前培养阶段。', resolve:s=>{ s.flags.extendGraduation = true; s.extendedYears = Math.min(2, (s.extendedYears || 0) + 1); return {}; }}]});
   }
   // 队内失和 10%
   if(Math.random()<0.10){
