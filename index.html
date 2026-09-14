@@ -101,6 +101,7 @@
     background:var(--card); border:1px solid var(--line); border-radius:12px; color:var(--ink);
     text-align:left; cursor:pointer; transition:.15s; overflow:hidden;}
   .college-item:active{transform:scale(.98);}
+  .college-item.disabled{opacity:.45; cursor:not-allowed;}
   .college-item.on{background:linear-gradient(150deg,rgba(61,155,255,.2),var(--card)); border-color:var(--accent);}
   .college-item .teamlogo{width:58px; height:58px; flex:0 0 auto; padding:5px; border-radius:12px;}
   .college-item .teamlogo img{width:100%; height:100%; object-fit:contain;}
@@ -333,6 +334,17 @@
     <p class="kicker" id="collegePreview">请选择你要加入的学院</p>
     <div class="spacer"></div>
     <button class="btn mt16" id="btnCollege" disabled>确认学院</button>
+  </div>
+
+  <!-- 医学分流 -->
+  <div class="screen" id="scr-medical-stream">
+    <div class="topbar"><span class="brand">⚽ 华工杯 · 校园足球模拟器</span></div>
+    <h2>医学分流</h2>
+    <p class="muted">大二学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。学业不足的选项会显示为灰色。</p>
+    <div class="panel" id="medicalStreamStats"></div>
+    <div class="collegegrid" id="medicalStreamGrid"></div>
+    <div class="result" id="medicalStreamResult" style="display:none;"></div>
+    <button class="btn gold" id="medicalStreamNext" style="display:none;">继续</button>
   </div>
 
   <!-- 球队分配 -->
@@ -586,6 +598,7 @@ const state = {
   achievements:{},
   showChoiceDetails:false,
   repeatYear:false,
+  extendedYearApplied:false,
   log:[]
 };
 
@@ -1015,9 +1028,9 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-2}, result:'你在竞选中落败，有些失落，但也看清了自己的差距。'};
         }},
       {text:'支持他人', effect:{relation:2,mentality:1}, result:'你主动推举了队友，自己在队里也很有分量。'}]};
-  if(year === (s.medical ? 3 : 2)) return {
-    tag: s.medical ? '医学大四 · 升学抉择' : '大三 · 年度特殊事件', title:'升学抉择', auto:false,
-    desc: s.medical ? '医学大四结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
+  if(year === (s.medical ? 4 : 2)) return {
+    tag: s.medical ? '医学大五 · 升学抉择' : '大三 · 年度特殊事件', title:'升学抉择', auto:false,
+    desc: s.medical ? '医学大五结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大三结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
       {text:'保研外校', warn:'需要学业值达到 85', cond:s=>s.stats.academy>=85, effect:{}, result:'', resolve:s=>{
           const p = clamp(0.25 + (s.stats.academy - 85) * 0.15, 0.25, 1);
@@ -1062,10 +1075,10 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-3}, result:'你尽了全力，却与跨考目标失之交臂。校园足球的生涯，似乎也要到此为止了。'};
         }},
       {text:'直接就业', effect:{}, result:'你决定毕业后先走向社会，绿茵场上的故事即将收尾。', path:'就业'}]};
-  if(year === (s.medical ? 4 : 3)) return {
-    tag: s.medical ? '医学大五 · 毕业' : '大四 · 年度特殊事件', title:'毕业', auto:true,
-    desc: s.medical ? '医学五年本科走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。' : '本科四年走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。',
-    choices:[{text:'回望校园', effect:{}, result: s.medical ? '这五年，有笑有泪，都成了青春里最滚烫的一页。' : '这四年，有笑有泪，都成了青春里最滚烫的一页。'}]};
+  if(year === 3 && !s.medical) return {
+    tag:'大四 · 年度特殊事件', title:'毕业', auto:true,
+    desc:'本科四年走到尽头，毕业的钟声即将敲响。你最后一次走过那片球场。',
+    choices:[{text:'回望校园', effect:{}, result:'这四年，有笑有泪，都成了青春里最滚烫的一页。'}]};
   // 深造年份
   const undergradYears = s.medical ? 5 : 4;
   if(s.path==='读研'){
@@ -1133,7 +1146,7 @@ function medicalStreamEvent(s){
     ['护理学院', 60],
     ['基础医学院', 0]
   ];
-  return {tag:'医学 · 年度特殊事件', title:'医学分流', auto:false,
+  return {tag:'医学 · 年度特殊事件', title:'医学分流', auto:false, medicalStream:true,
     desc:'大二学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习，并根据学业成绩分流。',
     choices: options.map(([name, req])=>({
       text: name,
@@ -1190,7 +1203,9 @@ function assignTransferCollege(s, sophomore){
   const oldName = s.team.name;
   const all = [...GROUPS['甲组'], ...GROUPS['乙组']].filter(name => name !== oldName);
   const name = pick(all);
-  const group = GROUPS['甲组'].includes(name) ? '甲组' : '乙组';
+  const inA = state.rosters && state.rosters['甲组'] && state.rosters['甲组'].includes(name);
+  const inB = state.rosters && state.rosters['乙组'] && state.rosters['乙组'].includes(name);
+  const group = inA ? '甲组' : (inB ? '乙组' : (GROUPS['甲组'].includes(name) ? '甲组' : '乙组'));
   s.team = { name, group };
   s.league = group;
   s.isCaptain = false;
@@ -2208,7 +2223,7 @@ function finishTournament(){
         }
       } else {
         if(t.type === '新生杯') state.flags.xinshengChampion = true;
-        if(t.type === '毕业杯' && !t.medicalRep) state.flags.biyeChampion = true;
+        if(t.type === '毕业杯') state.flags.biyeChampion = true;
         result = { rank: '冠军', title: `${t.type} 冠军！`, eff: {mentality: 4, relation: 5, ability: 2}, prose: `你们捧起了${t.type}的冠军奖杯！你在本届赛事共打入 ${t.playerGoals} 球，成为全校瞩目的焦点。` };
       }
     } else {
@@ -2217,9 +2232,9 @@ function finishTournament(){
         result = { rank: '亚军', title: `${t.type} 亚军`, eff: {mentality: 2, relation: 3, ability: 1}, prose: `你们一路杀进决赛，却最终屈居亚军。你在本届赛事打入 ${t.playerGoals} 球，遗憾与奖杯擦肩而过。` };
       } else if(fin === '半决赛'){
         result = { rank: '四强', title: `${t.type} 四强`, eff: {mentality: 1, relation: 2}, prose: `你们止步四强，已是相当出色的成绩。你在本届赛事打入 ${t.playerGoals} 球。` };
-      } else if(fin === '8强'){
+      } else if(fin === '8 强'){
         result = { rank: '八强', title: `${t.type} 八强`, eff: {relation: 1, mentality: 1}, prose: `你们打进八强，虽有遗憾，也算不虚此行。你在本届赛事打入 ${t.playerGoals} 球。` };
-      } else if(fin === '16强'){
+      } else if(fin === '16 强'){
         result = { rank: '十六强', title: `${t.type} 十六强`, eff: {mentality: 1}, prose: `你们止步十六强。你在本届赛事打入 ${t.playerGoals} 球。` };
       } else {
         result = { rank: '淘汰', title: `${t.type} 淘汰`, eff: {mentality: 1}, prose: `你们在淘汰赛中落败。你在本届赛事打入 ${t.playerGoals} 球。` };
@@ -3421,10 +3436,10 @@ function assignTeam(chosenGroup, chosenName){
   state.cards = { yellow:0, red:0 };
   state.suspension = { matchesLeft:0 };
   state.media = { fans:50, officials:50, fanMessage:'', officialMessage:'' };
+  state.extendedYearApplied = false;
   state.militaryYearsTotal = 0;
   state.militaryYearsCompleted = 0;
   state.militaryYearsRemaining = 0;
-  state.medical = false;
   state.cupSeasonCount = 0;
   state.championColleges = {};
   state.achievements = {};
@@ -3492,7 +3507,7 @@ function hintText(){
 function isEndMilestone(s){
   const y = s.year;
   const undergradYears = s.medical ? 5 : 4;
-  if(y===undergradYears-2 || y===undergradYears-1) return true;  // 升学、毕业
+  if(y===undergradYears-1 || (!s.medical && y===undergradYears-2)) return true;  // 升学、毕业
   if(s.path==='读研' && y===undergradYears+2) return true;  // 研三读博抉择
   if(s.path==='直博' && y===undergradYears+3) return true;  // 博四答辩
   if(s.path==='读博' && y===undergradYears+5) return true;  // 博三答辩
@@ -3552,8 +3567,10 @@ function startYear(){
   // 裁判成长事件：培训晋级或毕业杯决赛执法
   const refereeEv = refereeYearEvent(state);
   if(refereeEv) seq.push({ type:'event', ev: refereeEv });
-  // 毕业杯（大四毕业 / 深造毕业年级毕业前）
-  if(year === academicYears(state.path, state) - 1){
+  // 毕业杯（本科毕业年级与深造毕业年级都要参赛）
+  const undergradFinal = state.year === (state.medical ? 4 : 3);
+  const gradFinal = year === academicYears(state.path, state) - 1;
+  if(undergradFinal || gradFinal){
     if(state.medical && state.flags.medicalSplit){
       let savedTeam = state.team;
       seq.push({ type:'tourney', tourney:'毕业杯', role:'player',
@@ -3581,6 +3598,14 @@ function processQueue(){
     if(item.cond && !item.cond(state)){ return processQueue(); }
     if(item.before) item.before();
     launchTournament(item.tourney, item.role, ()=>{ if(item.after) item.after(); processQueue(); });
+    return;
+  }
+  if(item.ev.cond && !item.ev.cond(state)){
+    return processQueue();
+  }
+  if(item.ev.medicalStream){
+    current = item.ev;
+    renderMedicalStream(item.ev);
     return;
   }
   current = item.ev;
@@ -3614,6 +3639,50 @@ function renderEvent(ev){
     else { btn.onclick = ()=>chooseOption(ev, i); }
     box.appendChild(btn);
   });
+}
+
+function renderMedicalStream(ev){
+  show('scr-medical-stream');
+  $('medicalStreamStats').innerHTML = statBarHTML();
+  const grid = $('medicalStreamGrid'); grid.innerHTML = '';
+  $('medicalStreamResult').style.display = 'none';
+  $('medicalStreamNext').style.display = 'none';
+  ev.choices.forEach((c, i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'college-item';
+    const met = !c.cond || c.cond(state);
+    if(!met) btn.classList.add('disabled');
+    btn.disabled = !met;
+    btn.innerHTML = `<span class="teamlogo">${teamLogoHTML({ name:c.text, group:'同济组' })}</span>
+      <span class="college-text">
+        <span class="college-name">${c.text}</span>
+        <span class="college-group">${c.warn || '同济医学院（Tongji Medical College of HUST）'}</span>
+      </span>`;
+    btn.onclick = ()=>{ resolveMedicalStream(ev, i); };
+    grid.appendChild(btn);
+  });
+}
+
+function resolveMedicalStream(ev, i){
+  const c = ev.choices[i];
+  addLog(`${ev.title}：${c.text}`);
+  let eff = c.effect || {};
+  let result = c.result || '';
+  if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
+  const actual = applyStats(eff);
+  checkAchievements(state);
+  document.querySelectorAll('#medicalStreamGrid .college-item').forEach(btn=>{ btn.disabled = true; btn.classList.add('disabled'); });
+  $('medicalStreamStats').innerHTML = statBarHTML();
+  const box = $('medicalStreamResult');
+  box.style.display = 'block';
+  box.innerHTML = `${result || '……'}${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}`;
+  const next = $('medicalStreamNext');
+  next.style.display = 'block';
+  next.onclick = ()=>{
+    box.style.display = 'none';
+    next.style.display = 'none';
+    processQueue();
+  };
 }
 
 function effectText(eff){
@@ -3820,6 +3889,11 @@ function yearEnd(){
   if(state.injury){
     addLog(`学年结束，${state.injury.name} 已完全恢复`, '伤病');
     state.injury = null;
+  }
+  if(state.flags.extendGraduation && !state.extendedYearApplied){
+    state.extendedYearApplied = true;
+    state.year = Math.max(0, state.year - 1);
+    addLog('因延毕调整，下一年重读当前学年', '学业');
   }
   state.yearPlanDone = state.yearPlanTotal;
   const g = applyStats(annualGrowth(state));
