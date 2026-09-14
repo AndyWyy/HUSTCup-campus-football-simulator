@@ -350,7 +350,7 @@
   <div class="screen" id="scr-medical-stream">
     <div class="topbar"><span class="brand">⚽ 华工杯 · 校园足球模拟器</span></div>
     <h2>医学分流</h2>
-    <p class="muted">大三学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。分流去向只有基础医学院、第一临床学院和第二临床学院三个选项，学业不足的选项会显示为灰色。</p>
+    <p class="muted">大三学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。分流去向为基础医学院、第一临床学院和第二临床学院，三者可以自由选择。</p>
     <div class="panel" id="medicalStreamStats"></div>
     <div class="collegegrid" id="medicalStreamGrid"></div>
     <div class="result" id="medicalStreamResult" style="display:none;"></div>
@@ -543,11 +543,11 @@ function teamBaseStrength(teamName){ return TIER_BASE[teamTier(teamName)]; }
 const MEDICAL_ENTRY_COLLEGES = ['法医学系','公共卫生学院','护理学院','基础医学院','药学院','医药卫生管理学院'];
 /* 护理学院、医药卫生管理学院、药学院：同属同济组，但本科四年制，没有医学大五 */
 const FOUR_YEAR_MEDICAL_COLLEGES = ['护理学院','医药卫生管理学院','药学院'];
-/* 基础医学院大三的分流去向 */
+/* 基础医学院大三的分流去向（可自由选择，无学业门槛） */
 const MEDICAL_STREAM_COLLEGES = [
-  { name:'第一临床学院', req:85 },
-  { name:'第二临床学院', req:80 },
-  { name:'基础医学院', req:0 }
+  { name:'第一临床学院' },
+  { name:'第二临床学院' },
+  { name:'基础医学院' }
 ];
 /* 同济医学院组（华工杯同济医学院组）成员 */
 const isTongjiCollege = name => GROUPS['同济组'].includes(name);
@@ -1264,11 +1264,9 @@ function captainMilestone(year, s){
 function medicalStreamEvent(s){
   if(!s.medical || s.flags.medicalSplit) return null;
   return {tag:'医学 · 年度特殊事件', title:'医学分流', auto:false, medicalStream:true,
-    desc:'大三学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。分流去向为基础医学院、第一临床学院和第二临床学院，学业成绩决定你能进入哪一档。',
-    choices: MEDICAL_STREAM_COLLEGES.map(({name, req})=>({
+    desc:'大三学年开始，基础医学院学生将进入华中科技大学同济医学院（Tongji Medical College of HUST）相关专业学习。分流去向为基础医学院、第一临床学院和第二临床学院，三者可以自由选择。',
+    choices: MEDICAL_STREAM_COLLEGES.map(({name})=>({
       text: name,
-      warn: req ? `需要学业值达到 ${req}` : '',
-      cond: s=>s.stats.academy >= req,
       effect:{},
       result: name === '基础医学院'
         ? '你选择留在基础医学院继续学业，之后仍代表基础医学院参加华工杯同济医学院（Tongji Medical College of HUST）组比赛。'
@@ -4594,7 +4592,7 @@ function setupAchievementClaim(){
     state.achievementClaimed = true;
     $('achClaimOverlay').classList.remove('show');
     const title = encodeURIComponent(`全成就玩家登记：${id}`);
-    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2.1\n达成时间：${new Date().toLocaleString('zh-CN')}`);
+    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2.2\n达成时间：${new Date().toLocaleString('zh-CN')}`);
     window.open(`https://github.com/Fantasicrap/HUSTCup-campus-football-simulator/issues/new?title=${title}&body=${body}&labels=full-achievement`, '_blank');
   };
   $('achClaimCancel').onclick = ()=>{
