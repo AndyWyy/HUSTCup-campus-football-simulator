@@ -614,7 +614,7 @@ const state = {
           kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
-          wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false },
+          wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false },
   achievements:{},
   showChoiceDetails:false,
   repeatYear:false,
@@ -677,6 +677,7 @@ const ACHIEVEMENTS = [
   {id:'highest_honor', icon:'🏆', name:'最高荣誉', desc:'夺得超级杯冠军', check:s=>s.flags.superCupChampion},
   {id:'fruit_basket_killer', icon:'🍎', name:'果篮杀手', desc:'给韦世豪学长送出一个果篮', check:s=>s.flags.fruitBasket},
   {id:'best_wishes', icon:'🎁', name:'美好的祝愿', desc:'给徐彬学长送出一个冠军奖杯', check:s=>s.flags.trophyBlessing},
+  {id:'world_cup_promise', icon:'🌍', name:'世界杯？世界杯！', desc:'在学长彩蛋离别时获得世界杯承诺', check:s=>s.flags.worldCupPromise},
   {id:'referee_path', icon:'🟨', name:'黑衣初亮相', desc:'加入足球协会成为裁判员', check:s=>s.flags.referee},
   {id:'referee_level2', icon:'🟧', name:'二级裁判', desc:'通过二级裁判员培训', check:s=>s.refereeLevel>=2},
   {id:'referee_level1', icon:'🟥', name:'一级裁判', desc:'通过一级裁判员培训', check:s=>s.flags.refereeL1Passed},
@@ -1703,13 +1704,13 @@ function simulateSuperMatch(home, away){
 }
 
 const EASTER_EVENTS = [
-  {tag:'华工杯 · 彩蛋事件', title:'偶遇学长', desc:'你在华工杯踢完比赛后，偶遇了现效力于成都蓉城的24级本科生韦世豪。',
+  {tag:'华工杯 · 彩蛋事件', title:'偶遇学长', name:'韦世豪', desc:'你在华工杯踢完比赛后，偶遇了现效力于成都蓉城的24级本科生韦世豪。',
    choices:[
     {text:'给学长送一个果篮', effect:{}, result:'你把果篮递给学长，他先是一愣，随后笑着收下了。这个画面很快被同学们传开。', resolve:s=>{ s.flags.fruitBasket = true; return {}; }},
     {text:'热情打招呼，找他合影签名', effect:{relation:2, mentality:1}, result:'你上前热情打招呼，学长很随和，和你合影并签了名。'},
     {text:'找他单挑切磋球技', effect:{ability:3, mentality:1}, result:'你鼓起勇气提出单挑，学长陪你踢了一小会儿，还给你点了几处技术细节。'}
    ]},
-  {tag:'华工杯 · 彩蛋事件', title:'偶遇学长', desc:'你在华工杯踢完比赛后，偶遇了现效力于狼队的26级本科生徐彬。',
+  {tag:'华工杯 · 彩蛋事件', title:'偶遇学长', name:'徐彬', desc:'你在华工杯踢完比赛后，偶遇了现效力于狼队的26级本科生徐彬。',
    choices:[
     {text:'给学长送一个冠军奖杯', effect:{}, result:'你送给学长一个象征祝福的冠军奖杯，他十分意外，随后郑重地收下。', resolve:s=>{ s.flags.trophyBlessing = true; return {}; }},
     {text:'热情打招呼，找他合影签名', effect:{relation:2, mentality:1}, result:'你上前热情打招呼，学长很随和，和你合影并签了名。'},
@@ -1748,8 +1749,9 @@ function showEasterEgg(ev, onDone){
       let result = c.result || '';
       if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
       const actual = applyStats(eff);
+      state.flags.worldCupPromise = true;
       checkAchievements(state);
-      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}<button class="btn" id="easterNext">继续</button>`;
+      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}<div class="result">离别时，你祝愿中国队早日进入世界杯，${ev.name || '学长'}对你笑了笑，对你说“一定会的”。</div><button class="btn" id="easterNext">继续</button>`;
       $('easterNext').onclick = onDone;
     };
     box.appendChild(btn);
@@ -3669,7 +3671,7 @@ function assignTeam(chosenGroup, chosenName){
                   kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
-                  wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false };
+                  wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false };
   state.log = [];
 
   const tier = potentialTier(state.potential);
