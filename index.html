@@ -88,6 +88,7 @@
     padding:6px 14px; border-radius:20px; font-weight:700; font-size:14px;}
   .talent{font-size:12px; color:var(--gold); margin-top:8px;}
   .kicker{font-size:11px; color:var(--sub); text-align:center; margin-top:4px;}
+  .note-warn{color:var(--gold); font-size:12px; margin-top:6px; line-height:1.6;}
   /* 位置选择 */
   .posgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:10px 0 4px;}
   .posbtn{padding:12px 6px; background:var(--card); border:1px solid var(--line); border-radius:12px;
@@ -662,7 +663,7 @@ const state = {
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
-          pharmacyTrack:'' },
+          pharmacyTrack:'', mentalBreakdown:false },
   achievements:{},
   achievementClaimed:false,
   achievementPromptShown:false,
@@ -1288,14 +1289,38 @@ const PHARMACY_TRACKS = [
 /* 生物药学的隐藏特性（不在游戏文本中展示）：
    1. 学业类事件出现率比同济组基准高 10%
    2. 涉及学业变动的事件选项成功率降低 5%
-   3. 升学抉择时保研（外校 / 本校）成功率提升 20% */
+   3. 升学抉择时保研（外校 / 本校）成功率提升 20%
+   4. 学业值低于 60 时，每次事件抉择额外 心态 -1
+   5. 心态值低于 30 时触发坏结局「空中飞人」，直接结束生涯 */
 const BIO_PHARMACY = '生物药学';
 const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.30;   // 学业类事件权重倍率（按实测占比校准到比同济组 +10%）
 const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.95;    // 学业变动选项成功率倍率
 const BIO_PHARMACY_BAOYAN_SCALE = 1.2;          // 保研成功率倍率
+const BIO_PHARMACY_LOW_ACADEMY = 60;            // 学业值警戒线
+const BIO_PHARMACY_LOW_ACADEMY_DRAIN = -1;      // 每次事件抉择额外扣除的心态
+const BIO_PHARMACY_BREAKDOWN_MENTALITY = 30;    // 心态崩溃线
+const BIO_PHARMACY_LOW_ACADEMY_TIP = '由于学业值低于 60，心态额外 -1';
 function isBioPharmacy(s){
   const t = s || state;
   return !!(t.flags && t.flags.pharmacyTrack === BIO_PHARMACY);
+}
+/* 学业值低于 60 时，每次事件抉择额外扣心态；返回是否触发 */
+function bioPharmacyChoiceDrain(){
+  if(!isBioPharmacy()) return false;
+  if(state.stats.academy >= BIO_PHARMACY_LOW_ACADEMY) return false;
+  state.stats.mentality = clamp(state.stats.mentality + BIO_PHARMACY_LOW_ACADEMY_DRAIN);
+  return true;
+}
+function lowAcademyTipHTML(drained){
+  return drained ? `<div class="note-warn">${BIO_PHARMACY_LOW_ACADEMY_TIP}</div>` : '';
+}
+/* 心态跌破 30：直接进入坏结局 */
+function bioPharmacyBreakdown(){
+  if(!isBioPharmacy()) return false;
+  if(state.stats.mentality >= BIO_PHARMACY_BREAKDOWN_MENTALITY) return false;
+  state.flags.mentalBreakdown = true;
+  showEnding();
+  return true;
 }
 /* 选项是否涉及学业值变动 */
 function touchesAcademy(c){
@@ -2005,11 +2030,13 @@ function showEasterEgg(ev, onDone){
       addLog(`${ev.title}：${c.text}`);
       let eff = c.effect || {};
       let result = c.result || '';
+      const drained = bioPharmacyChoiceDrain();
       if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
       const actual = applyStats(eff);
-      state.flags.worldCupPromise = true;
       checkAchievements(state);
-      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}<div class="result">离别时，你祝愿中国队早日进入世界杯，${ev.name || '学长'}对你笑了笑，对你说“一定会的”。</div><button class="btn" id="easterNext">继续</button>`;
+      if(bioPharmacyBreakdown()) return;
+      state.flags.worldCupPromise = true;
+      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}${lowAcademyTipHTML(drained)}<div class="result">离别时，你祝愿中国队早日进入世界杯，${ev.name || '学长'}对你笑了笑，对你说“一定会的”。</div><button class="btn" id="easterNext">继续</button>`;
       $('easterNext').onclick = onDone;
     };
     box.appendChild(btn);
@@ -2056,10 +2083,12 @@ function showBetweenMatchEvent(ev, onDone){
       addLog(`${ev.title}：${c.text}`);
       let eff = c.effect || {};
       let result = c.result || '';
+      const drained = bioPharmacyChoiceDrain();
       if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
       const actual = applyStats(eff);
       checkAchievements(state);
-      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}<button class="btn" id="betweenNext">继续</button>`;
+      if(bioPharmacyBreakdown()) return;
+      box.innerHTML = `<div class="result">${result || '……'}</div>${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}${lowAcademyTipHTML(drained)}<button class="btn" id="betweenNext">继续</button>`;
       $('betweenNext').onclick = onDone;
     };
     box.appendChild(btn);
@@ -3573,6 +3602,9 @@ const COACH_EVENTS = [
 
 /* ---------------- 结局（21 个，按优先级） ---------------- */
 const ENDINGS = [
+  {id:'mental_breakdown', cond:s=>s.flags.mentalBreakdown,
+   tag:'隐藏 · 坏结局', title:'空中飞人', quote:'有些重量，从来不会出现在成绩单上。',
+   prose:'学业、训练、期待，还有那些没人问过你扛不扛得住的事，一层层叠上来。你没能等到下一场哨响。后来，这个名字成了校园里的一个代号，而你的故事，就停在了那一年。'},
   {id:'kaoyan_fail', cond:s=>s.flags.kaoyanFail,
    tag:'本科毕业 · 结局', title:'回归生活', quote:'有些告别，悄无声息，却是真的结束了。',
    prose:'考研落榜后，你告别了校园足球。没有盛大的告别赛，没有队友的挽留，你只是把球鞋塞进行李箱，找了一份普通的工作，回到了生活的洪流里。偶尔路过学校的球场，你会停下来看一会儿，然后笑着离开。你知道，那个在绿茵场上奔跑的少年，已经留在了昨天。'},
@@ -3999,7 +4031,7 @@ function assignTeam(chosenGroup, chosenName){
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
-                  pharmacyTrack:'' };
+                  pharmacyTrack:'', mentalBreakdown:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
   state.flags.medicalDirect = medicalDirect;
   if(medicalDirect) state.flags.medicalSplit = true;
@@ -4254,14 +4286,16 @@ function resolveMedicalStream(ev, i){
   addLog(`${ev.title}：${c.text}`);
   let eff = c.effect || {};
   let result = c.result || '';
+  const drained = bioPharmacyChoiceDrain();
   if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
   const actual = applyStats(eff);
   checkAchievements(state);
+  if(bioPharmacyBreakdown()) return;
   document.querySelectorAll('#medicalStreamGrid .college-item').forEach(btn=>{ btn.disabled = true; btn.classList.add('disabled'); });
   $('medicalStreamStats').innerHTML = statBarHTML();
   const box = $('medicalStreamResult');
   box.style.display = 'block';
-  box.innerHTML = `${result || '……'}${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}`;
+  box.innerHTML = `${result || '……'}${actual && Object.keys(actual).length ? `<div class="delta">${effectText(actual)}</div>` : ''}${lowAcademyTipHTML(drained)}`;
   const next = $('medicalStreamNext');
   next.style.display = 'block';
   next.onclick = ()=>{
@@ -4350,13 +4384,14 @@ function chooseOption(ev, i){
     const roll = rollChoice(c);
     if(c.onSuccess && roll.success) c.onSuccess(state);
     if(c.onFail && !roll.success) c.onFail(state);
-    animateResult(roll);
+    animateResult(roll, bioPharmacyChoiceDrain());   // 生物药学：低学业心态消耗
     return;
   }
 
   // 确定性选项（旧格式：里程碑等）
   let eff = c.effect || {};
   let result = c.result || '';
+  const drained = bioPharmacyChoiceDrain();   // 生物药学：低学业心态消耗
   if(c.resolve){ const r = c.resolve(state); eff = r.effect||eff; result = r.result||result; }
   if(c.risk==='bigInjury' && Math.random()<0.12){ // 带伤硬扛 12% 恶化
     state.flags.bigInjury=true; state.repeatYear=true;
@@ -4365,7 +4400,8 @@ function chooseOption(ev, i){
   }
   const actual = applyStats(eff);
   checkAchievements(state);
-  showResult(result, actual, c.serviceYears || 0);
+  if(bioPharmacyBreakdown()) return;
+  showResult(result, actual, c.serviceYears || 0, lowAcademyTipHTML(drained));
 }
 
 function balanceEffects(eff){
@@ -4394,7 +4430,7 @@ function applyStats(eff){
 }
 
 /* 结算动画：数值在可能结果间来回跳动，最后落定 */
-function animateResult(roll){
+function animateResult(roll, drained){
   const box = $('evChoices');
   box.innerHTML = '<div class="result rolling">命运正在决定……</div>';
   const balanced = balanceEffects(roll.effects);
@@ -4416,15 +4452,16 @@ function animateResult(roll){
       const actual = applyStats(roll.effects);
       $('evStats').innerHTML = statBarHTML();
       checkAchievements(state);
-      showResult(roll.text, actual);
+      if(bioPharmacyBreakdown()) return;
+      showResult(roll.text, actual, 0, lowAcademyTipHTML(drained));
     }
   }, 75);
 }
 
-function showResult(result, eff, serviceYears=0){
+function showResult(result, eff, serviceYears=0, note=''){
   const box = $('evChoices');
   const delta = eff && Object.keys(eff).length ? `<div class="delta">${effectText(eff)}</div>`:'';
-  box.innerHTML = `<div class="result">${result||'……'}</div>${delta}
+  box.innerHTML = `<div class="result">${result||'……'}</div>${delta}${note || ''}
     <button class="btn" id="btnNext">${serviceYears ? '开始服役' : '继续'}</button>`;
   $('btnNext').onclick = ()=>{
     if(serviceYears){
