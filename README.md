@@ -120,6 +120,8 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 
 ### 升学和深造
 
+普通本科生在大四触发升学抉择，医学生则延后到医学大五触发。
+
 本科阶段可以选择：
 
 - 保研外校
