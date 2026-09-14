@@ -57,7 +57,7 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 
 ### 新生杯
 
-大一以球员身份参加；大二以后，如果担任队长，可以以新生队教练身份带队。
+大一以球员身份参加；大三以后，如果担任队长，可以以新生队教练身份带队。
 
 29 支球队混合分组，每组前两名晋级淘汰赛，常规时间 60 分钟。
 
@@ -116,6 +116,7 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 - 大二根据学业成绩分流到华中科技大学同济医学院（Tongji Medical College of HUST）相关专业。
 - 医学生本科为五年制。
 - 毕业杯时以基础医学院名义参加主校区比赛。
+- 医学分流使用独立选择页面，学业门槛不足的专业会置灰。
 
 ### 升学和深造
 
