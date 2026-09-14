@@ -274,6 +274,15 @@
     border-bottom:1px dashed var(--line); color:var(--sub);}
   .media-line:last-child{border-bottom:none; padding-bottom:0;}
   .media-line .media-channel{flex:0 0 auto; font-weight:700; color:var(--ink);}
+  .claim-overlay{position:fixed; inset:0; background:rgba(6,12,20,.88); z-index:80;
+    display:none; align-items:center; justify-content:center; padding:20px;}
+  .claim-overlay.show{display:flex;}
+  .claim-card{width:100%; max-width:420px; background:linear-gradient(160deg,#1e3a5f,#14263d);
+    border:1px solid var(--line); border-radius:16px; padding:22px; text-align:center;}
+  .claim-card h2{margin-bottom:10px;}
+  .claim-card p{font-size:13px; color:var(--sub); line-height:1.7;}
+  .claim-card input{width:100%; margin:14px 0 10px; padding:12px; border-radius:10px;
+    border:1px solid var(--line); background:#0d1826; color:var(--ink); font-size:15px; text-align:center; outline:none;}
 
   /* ===== 双端适配 ===== */
   @media (min-width:768px){
@@ -469,6 +478,15 @@
   </div>
 
   <div class="ach-toast" id="achToast"></div>
+  <div class="claim-overlay" id="achClaimOverlay">
+    <div class="claim-card">
+      <h2>全成就达成</h2>
+      <p>恭喜你完成了全部成就！留下你的游戏 ID 或名字，即可申请进入 GitHub 全成就名单。</p>
+      <input id="achClaimId" maxlength="20" placeholder="请输入 ID 或名字">
+      <button class="btn gold" id="achClaimSubmit">提交登记</button>
+      <button class="btn ghost" id="achClaimCancel" style="margin-top:8px;">稍后再说</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -617,6 +635,8 @@ const state = {
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false },
   achievements:{},
+  achievementClaimed:false,
+  achievementPromptShown:false,
   showChoiceDetails:false,
   repeatYear:false,
   extendedYears:0,
@@ -697,6 +717,10 @@ function checkAchievements(s){
     addLog(`成就解锁：${a.icon} ${a.name}`);
     showAchievementToast(a);
   });
+  if(!state.achievementPromptShown && achievementCount() === ACHIEVEMENTS.length){
+    state.achievementPromptShown = true;
+    showFullAchievementClaim();
+  }
 }
 
 function achievementCount(){
@@ -3850,6 +3874,8 @@ function assignTeam(chosenGroup, chosenName){
   state.cupSeasonCount = 0;
   state.championColleges = {};
   state.achievements = {};
+  state.achievementClaimed = false;
+  state.achievementPromptShown = false;
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
                   kaoyanFail:false, referee:false, refereeFinal:false, refereeL1Passed:false, refereeLeagueQualified:false,
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
@@ -4362,6 +4388,27 @@ function showEnding(){
 }
 
 /* ---------------- 启动 ---------------- */
+function showFullAchievementClaim(){
+  const overlay = $('achClaimOverlay');
+  if(!overlay) return;
+  $('achClaimId').value = state.name || '';
+  overlay.classList.add('show');
+}
+
+function setupAchievementClaim(){
+  $('achClaimSubmit').onclick = ()=>{
+    const id = ($('achClaimId').value || '').trim() || state.name || '匿名玩家';
+    state.achievementClaimed = true;
+    $('achClaimOverlay').classList.remove('show');
+    const title = encodeURIComponent(`全成就玩家登记：${id}`);
+    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2\n达成时间：${new Date().toLocaleString('zh-CN')}`);
+    window.open(`https://github.com/Fantasicrap/HUSTCup-campus-football-simulator/issues/new?title=${title}&body=${body}&labels=full-achievement`, '_blank');
+  };
+  $('achClaimCancel').onclick = ()=>{
+    $('achClaimOverlay').classList.remove('show');
+  };
+}
+
 function setupRevealToggle(){
   const toggle = $('revealChoices');
   if(!toggle) return;
@@ -4375,6 +4422,7 @@ function setupRevealToggle(){
 }
 
 setupRevealToggle();
+setupAchievementClaim();
 initName();
 show('scr-notice');
 </script>

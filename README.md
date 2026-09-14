@@ -262,6 +262,8 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 
 同济医学院（Tongji Medical College of HUST）组冠军不计入“全满贯”，但会作为一支不同学院的杯赛冠军计入“双院名宿”。超级杯冠军计入“全满贯”和“双院名宿”。
 
+达成全部成就后，玩家可以留下 ID 或名字进行登记，全成就名单见 [FULL_ACHIEVERS.md](FULL_ACHIEVERS.md)。
+
 ## 结局系统
 
 游戏根据最终路径、数值、荣誉和特殊经历匹配结局，包括：
