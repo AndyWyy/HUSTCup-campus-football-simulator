@@ -663,7 +663,7 @@ const state = {
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
-          pharmacyTrack:'', mentalBreakdown:false },
+          pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false },
   achievements:{},
   achievementClaimed:false,
   achievementPromptShown:false,
@@ -1002,7 +1002,8 @@ const REGULAR_EVENTS = [
    choices:[
      ch('全力补救', statProb({academy:0.02}, 0.2, 0.05, 0.96), 'academy', {academy:3,mentality:1}, {ability:-2}, '你拼了命补课，绩点拉了回来。', '你基础太差，补起来很吃力。'),
      ch('求助学霸', statProb({academy:0.015,relation:0.004}, 0.25, 0.05, 0.94), 'relation', {academy:2,relation:1}, {relation:-1}, '学霸带你飞，成绩稳步回升。', '你太依赖别人，考试还是不会。'),
-     ch('放弃挣扎', 0.4, 'mentality', {mentality:1}, {academy:-3,mentality:-2}, '你索性摆烂，反而轻松了。', '你彻底摆烂，挂科留级，前途堪忧。')]},
+     ch('放弃挣扎', 0.4, 'mentality', {mentality:1}, {academy:-3,mentality:-2}, '你索性摆烂，反而轻松了。', '你彻底摆烂，挂科留级，前途堪忧。',
+        {bioRedemption:true, onSuccess:s=>{ s.flags.academicWarningHandled = true; }})]},
   {id:'exam_crash', title:'考试失利', cond:s=>s.stats.academy<90,
    desc:'一门重要的专业课成绩出来，你考砸了，这对你的绩点和保研计划是沉重打击。',
    choices:[
@@ -1297,7 +1298,10 @@ const PHARMACY_TRACKS = [
    4. 学业值低于 55 时，每次事件抉择额外 心态 -1
    5. 心态值低于 35 时触发退学结局，直接结束生涯
    6. 学业值低于 55 时，学业类事件出现率提升 20%
-   7. 学业值低于 55 时，涉及学业变动的事件选项成功率提升 25%（上限 100%） */
+   7. 学业值低于 55 时，涉及学业变动的事件选项成功率提升 25%（上限 100%）
+   8. 学业值低于 55 时，每年必定出现一次「学业警告」事件
+   9. 学业警告事件中选择「放弃挣扎」，成功率提升 40%
+   10.「放弃挣扎」判定成功后，不再触发退学结局，也不再因学业值过低而扣心态 */
 const BIO_PHARMACY = '生物药学';
 const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.30;   // 学业类事件权重倍率（按实测占比校准到比同济组 +10%）
 const BIO_PHARMACY_CHOICE_PROB_SCALE = 0.95;    // 学业变动选项成功率倍率
@@ -1308,13 +1312,16 @@ const BIO_PHARMACY_BREAKDOWN_MENTALITY = 35;    // 心态崩溃线
 const BIO_PHARMACY_LOW_ACADEMY_TIP = '由于学业值低于 55，心态额外 -1';
 const BIO_PHARMACY_LOW_ACADEMY_EVENT_SCALE = 1.88;   // 低学业时学业类事件权重倍率（按实测占比校准到 +20%）
 const BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE = 1.25;     // 低学业时学业变动选项成功率倍率（上限 100%）
+const BIO_PHARMACY_REDEMPTION_PROB_SCALE = 1.4;       // 学业警告「放弃挣扎」成功率倍率
 function isBioPharmacy(s){
   const t = s || state;
   return !!(t.flags && t.flags.pharmacyTrack === BIO_PHARMACY);
 }
-/* 学业值低于 55 时，每次事件抉择额外扣心态；返回是否触发 */
+/* 学业值低于 55 时，每次事件抉择额外扣心态；返回是否触发
+   「放弃挣扎」判定成功后免疫该效果与退学结局 */
 function bioPharmacyChoiceDrain(){
   if(!isBioPharmacy()) return false;
+  if(state.flags.academicWarningHandled) return false;
   if(state.stats.academy >= BIO_PHARMACY_LOW_ACADEMY) return false;
   state.stats.mentality = clamp(state.stats.mentality + BIO_PHARMACY_LOW_ACADEMY_DRAIN);
   return true;
@@ -1325,6 +1332,7 @@ function lowAcademyTipHTML(drained){
 /* 心态跌破 35：直接进入坏结局 */
 function bioPharmacyBreakdown(){
   if(!isBioPharmacy()) return false;
+  if(state.flags.academicWarningHandled) return false;
   if(state.stats.mentality >= BIO_PHARMACY_BREAKDOWN_MENTALITY) return false;
   state.flags.mentalBreakdown = true;
   showEnding();
@@ -4039,7 +4047,7 @@ function assignTeam(chosenGroup, chosenName){
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
-                  pharmacyTrack:'', mentalBreakdown:false };
+          pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
   state.flags.medicalDirect = medicalDirect;
   if(medicalDirect) state.flags.medicalSplit = true;
@@ -4146,6 +4154,18 @@ function startYear(){
   const shuffled = weightedShuffle(pool, eventDrawWeight);
   const regularBefore = shuffled.slice(0, nBefore).map(e=>({tag:'常规事件', ...e}));
   const regularAfter = shuffled.slice(nBefore, n).map(e=>({tag:'常规事件', ...e}));
+  // 生物药学：学业值低于 55 时，本年必定出现一次「学业警告」（隐藏特性）
+  if(isBioPharmacy() && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
+    const picked = [...regularBefore, ...regularAfter];
+    if(!picked.some(e => e.id === 'academic_warning')){
+      const warnEv = shuffled.find(e => e.id === 'academic_warning')
+        || adaptEventForPlayer(REGULAR_EVENTS.find(e => e.id === 'academic_warning'));
+      if(warnEv){
+        const slot = regularAfter.length ? regularAfter : regularBefore;
+        if(slot.length) slot[slot.length - 1] = { tag:'常规事件', ...warnEv };
+      }
+    }
+  }
   // 随机特殊事件
   const randoms = randomSpecialEvents(state);
 
@@ -4348,6 +4368,10 @@ function choiceRollParams(c){
   // 生物药学：学业值低于 55 时，学业变动选项成功率提升 25%，上限 100%（隐藏特性）
   if(isBioPharmacy() && touchesAcademy(c) && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
     p = Math.min(p * BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE, 1);
+  }
+  // 生物药学：学业警告「放弃挣扎」成功率提升 40%（隐藏特性）
+  if(isBioPharmacy() && c.bioRedemption && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
+    p = Math.min(p * BIO_PHARMACY_REDEMPTION_PROB_SCALE, 1);
   }
   const scale = c.fixed ? 1 : 0.8 + sv/100 * 0.7;   // 裁判班使用固定概率与固定效果；普通事件仍与基础数值关联
   return { p, scale };
