@@ -4229,8 +4229,9 @@ function startYear(){
     const transferEv = transferExamEvent(state);
     if(transferEv) seq.push({ type:'event', ev: transferEv });
   }
-  // 华工杯（每年触发）
-  seq.push({ type:'tourney', tourney:'华工杯', role:'player', cond: s => !(s.medical && !s.flags.medicalSplit) });
+  // 华工杯（每年触发）；基础医学院大一新生先打新生杯，大二起以基础医学院身份参加同济医学院组
+  seq.push({ type:'tourney', tourney:'华工杯', role:'player',
+    cond: s => !(s.medical && !s.flags.medicalSplit && s.year === 0) });
   // 常规事件（少）+ 随机
   regularAfter.forEach(e => seq.push({ type:'event', ev: e }));
   randoms.forEach(e => seq.push({ type:'event', ev: e }));
