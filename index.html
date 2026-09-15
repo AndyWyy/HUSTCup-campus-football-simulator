@@ -555,8 +555,19 @@ const isTongjiCollege = name => GROUPS['同济组'].includes(name);
 const isFiveYearMedicalCollege = name => isTongjiCollege(name) && !FOUR_YEAR_MEDICAL_COLLEGES.includes(name);
 
 /* 当前球员是否属于同济医学院组（旧存档没有 tongji 字段时回退到球队分组判断） */
-function isTongjiPlayer(){
-  return !!(state.tongji || (state.team && state.team.group === '同济组'));
+function isTongjiState(s){
+  const t = s || state;
+  return !!(t.tongji || (t.team && t.team.group === '同济组'));
+}
+function isTongjiPlayer(){ return isTongjiState(state); }
+
+/* 见习 / 实习事件：仅基础医学院、临床药学专业、护理学院、第一临床学院、第二临床学院可见 */
+const CLINICAL_ROTATION_COLLEGES = ['基础医学院','护理学院','第一临床学院','第二临床学院'];
+function canClinicalRotation(s){
+  const t = s || state;
+  if(!t.team) return false;
+  if(CLINICAL_ROTATION_COLLEGES.includes(t.team.name)) return true;
+  return t.team.name === '药学院' && t.flags && t.flags.pharmacyTrack === '临床药学';
 }
 
 /* 新生杯 / 毕业杯的主校区参赛名单：主校区 29 队 + 医学类 6 队 */
@@ -665,7 +676,7 @@ const state = {
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
-          stayUpChain:false, stayUpPush:false },
+          stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false },
   achievements:{},
   achievementClaimed:false,
   achievementPromptShown:false,
@@ -1086,6 +1097,63 @@ const REGULAR_EVENTS = [
      ch('每场赛后复盘', 0.7, 'academy', {academy:2,relation:1}, {mentality:-1}, '你从每次复盘中提炼细节，判罚越来越稳。', '你复盘到深夜，第二天训练昏昏沉沉。', {onSuccess:s=>{s.refereeMatches+=2;}}),
      ch('跟满全部场次', 0.62, 'mentality', {mentality:2,relation:1}, {academy:-1}, '你跟满整个赛程，对比赛节奏有了真实手感。', '你连轴转太累，学期末绩点有些危险。', {onSuccess:s=>{s.refereeMatches+=3;}}),
      ch('主动请教争议', 0.75, 'relation', {relation:2,mentality:1}, {relation:-1}, '学长欣赏你的好问，把你介绍给了更多裁判同行。', '你问题太多，学长有点不耐烦。')]}
+  ,
+  /* ---------------- 医学院专属事件（同济组可见） ---------------- */
+  {id:'anatomy_lab', title:'解剖实验室第一课', cond:s=>isTongjiState(s),
+   desc:'第一次进解剖实验室，福尔马林的味道扑面而来，你握着器械的手有点僵。',
+   choices:[
+     ch('认真观摩', 0.72, 'academy', {academy:2, ability:1}, {mentality:-1}, '你稳住了心神，把主要结构都记了下来。', '你脑子一片空白，一节课什么都没记住。'),
+     ch('强忍不适硬撑', 0.55, 'mentality', {mentality:1, relation:1}, {mentality:-2, ability:-1}, '你硬撑完整节课，还主动帮同学递器械。', '你中途冲出去吐了，被同学记了很久。'),
+     ch('申请去隔壁看标本', 0.8, 'mentality', {mentality:1, academy:-1}, {academy:-1}, '你换了个方式学习，慢慢跟上了进度。', '你躲了这节课，落下的内容后来补得很辛苦。')]},
+  {id:'osce', title:'医学技能考核', cond:s=>isTongjiState(s),
+   desc:'临床技能考核分三站：缝合、心肺复苏、测量血压，手稳不稳一眼就能看出来。',
+   choices:[
+     ch('提前加练', 0.75, 'ability', {ability:2, academy:1}, {mentality:-1}, '你把每一站都练到位，考官点了点头。', '你练得太杂，反而哪一站都不熟。'),
+     ch('临场发挥', 0.6, 'mentality', {ability:1, mentality:1}, {academy:-1, mentality:-1}, '你凭着手上感觉稳稳过关。', '你一上手就慌了，缝线歪歪扭扭。'),
+     ch('找同学互练', 0.7, 'relation', {relation:2, ability:1}, {relation:-1}, '你们互相在胳膊上练，配合越来越默契。', '你们互相嫌弃手笨，练了半天没进步。')]},
+  {id:'mnemonic_song', title:'背书歌与记忆宫殿', cond:s=>isTongjiState(s),
+   desc:'同学把一长串知识点编成了顺口溜，说这样背得快，只是唱起来有点丢人。',
+   choices:[
+     ch('跟着编顺口溜', 0.8, 'academy', {academy:2, mentality:1}, {relation:-1}, '你把知识点唱成了歌，考试时张口就来。', '你唱了一路，被队友当成神经病。'),
+     ch('用记忆宫殿', 0.65, 'academy', {academy:2}, {mentality:-1}, '你把知识点放进"宿舍到球场"的路线里，记得很牢。', '宫殿修得太复杂，你连门都找不到。'),
+     ch('硬背', 0.5, 'academy', {academy:1, mentality:-1}, {mentality:-1, academy:-1}, '你靠死记硬背啃了下来。', '你背到凌晨，第二天全忘了。')]},
+  {id:'stand_in_medic', title:'临时队医', cond:s=>isTongjiState(s),
+   desc:'训练时队医不在，主力中场突然拉伤倒地，所有人的目光都看向你。',
+   choices:[
+     ch('上手处理', 0.68, 'academy', {relation:2, ability:1}, {relation:-1, mentality:-1}, '你按课上学的流程处理，队友直呼专业。', '你手忙脚乱，事后还被队医点名批评。'),
+     ch('先固定再叫人', 0.8, 'ability', {relation:1, mentality:1}, {relation:-1}, '你稳妥地做了固定，处理得很得体。', '你耽误了时间，队友疼得直骂人。'),
+     ch('喊住所有人别乱动', 0.85, 'mentality', {relation:1}, {relation:-1}, '你让所有人别乱动，场面很快稳住。', '你光喊不动手，被队友翻了个白眼。')]},
+  {id:'warmup_talk', title:'运动防护讲座', cond:s=>isTongjiState(s),
+   desc:'队里想请你给全队讲讲热身与运动防护，你要不要接这个活？',
+   choices:[
+     ch('认真准备并开讲', 0.72, 'academy', {relation:2, mentality:1}, {mentality:-1}, '你讲得清楚，全队的热身都规范了不少。', '你讲得太学术，队友听得一头雾水。', {onSuccess:s=>{ s.flags.warmedUpMatch = true; }}),
+     ch('简单演示几组动作', 0.8, 'ability', {relation:1, ability:1}, {relation:-1}, '你带着大家做了一组，简单有效。', '动作太随意，没人当回事。', {onSuccess:s=>{ s.flags.warmedUpMatch = true; }}),
+     ch('推给别人', 0.85, 'mentality', {mentality:1}, {relation:-1}, '你把活推给了师兄，落得清闲。', '队友觉得你不愿意出力。')]},
+  /* ---------------- 见习 / 实习事件（基础医学院、临床药学、护理学院、第一临床学院、第二临床学院） ---------------- */
+  {id:'morning_rounds', title:'见习早八查房', cond:s=>canClinicalRotation(s),
+   desc:'早上七点半的病房，你要跟着带教老师查房；可下午还有训练。',
+   choices:[
+     ch('跟完整个查房', 0.75, 'academy', {academy:2, relation:1}, {ability:-1}, '你跟着老师看完整轮，笔记记了满满两页。', '你困得直点头，老师看了你两眼。'),
+     ch('请假去训练', 0.8, 'relation', {relation:2, ability:1}, {academy:-2}, '你在训练里状态极佳，教练很满意。', '你请了假，老师在名单上记住了你。'),
+     ch('两头跑', 0.55, 'mentality', {academy:1, ability:1, mentality:-1}, {mentality:-2, ability:-1}, '你两头都赶上了，累但值得。', '你两头都迟到，还把自己熬崩了。')]},
+  {id:'night_shift', title:'值夜班', cond:s=>canClinicalRotation(s),
+   desc:'科室排班轮到你的夜班，可明天下午就是比赛。',
+   choices:[
+     ch('值完夜班再上场', 0.6, 'mentality', {mentality:1, relation:1}, {mentality:-2, ability:-1}, '你值完夜班赶到球场，居然还踢得不错。', '你整场都在打哈欠，身体沉得像灌了铅。', {fatigueMatch:true}),
+     ch('找人换班', 0.7, 'relation', {relation:1, mentality:1}, {relation:-1, academy:-1}, '你顺利换了班，第二天精神饱满。', '没人愿意换，你还欠下人情。'),
+     ch('请病假', 0.55, 'mentality', {mentality:1}, {academy:-2, relation:-1}, '你躲过夜班，睡了个好觉。', '你请假的理由太假，被带教老师记住。')]},
+  {id:'doctor_fan', title:'科里的老师是球迷', cond:s=>canClinicalRotation(s),
+   desc:'带教老师听说你在踢华工杯，午休时特意把你叫过去聊了两句。',
+   choices:[
+     ch('请老师来看比赛', 0.7, 'relation', {relation:2, academy:1}, {academy:-1}, '老师真去看了比赛，还在同学面前夸了你。', '老师临时排了手术，你白等一场。'),
+     ch('陪老师聊战术', 0.75, 'relation', {relation:1, mentality:1}, {mentality:-1}, '你们从阵型聊到值班表，关系近了不少。', '你对战术的理解太浅，聊得有点尴尬。'),
+     ch('谦虚推辞', 0.85, 'academy', {academy:1, mentality:1}, {relation:-1}, '你把话题拉回病例，老师对你印象不错。', '老师觉得你不太近人情。')]},
+  {id:'first_death', title:'第一次面对死亡', cond:s=>canClinicalRotation(s),
+   desc:'你第一次经历病人离世。走出病房时，走廊的灯亮得刺眼。',
+   choices:[
+     ch('找队友倾诉', 0.75, 'relation', {relation:2, mentality:1}, {mentality:-1}, '队友陪你在操场边坐了很久，你好受了些。', '你说不出口，话到嘴边又咽了回去。'),
+     ch('一个人消化', 0.5, 'mentality', {mentality:2}, {mentality:-3}, '你把这件事慢慢消化了，整个人沉稳了很多。', '那几天你一直睡不好，训练也提不起劲。'),
+     ch('去球场发泄', 0.65, 'ability', {ability:2, mentality:-1}, {mentality:-2, ability:-1}, '你在球场跑到脱力，反而轻松了一点。', '你越踢越烦，动作越来越大，被队友拉下场。')]}
 ];
 
 /* ---------------- 事件池调整（同济医学院组） ---------------- */
@@ -2620,7 +2688,9 @@ function resolveMatchEvent(i){
 function rollMatchInjury(){
   if(state.injury || tourney.role === 'coach') return;
   const base = {前锋:0.035, 中场:0.04, 后卫:0.05, 门将:0.025}[state.position] || 0.035;
-  const p = clamp(base + (tourney.matchInjuryRisk || 0) * 0.04 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.01, 0.2);
+  // 值夜班（+1）/ 运动防护讲座（−1）的一次性状态修正，只影响本场比赛
+  const fatigue = (state.flags.fatiguedMatch ? 1 : 0) - (state.flags.warmedUpMatch ? 1 : 0);
+  const p = clamp(base + ((tourney.matchInjuryRisk || 0) + fatigue) * 0.04 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.01, 0.2);
   if(Math.random() >= p) return;
   const r = Math.random();
   if(r < 0.45){
@@ -2698,6 +2768,8 @@ function finishMatch(){
   } else if(t.role !== 'coach'){
     rollMatchInjury();
   }
+  state.flags.fatiguedMatch = false;   // 一次性状态修正只作用于本场比赛
+  state.flags.warmedUpMatch = false;
 
   // 写回结果
   if(t.stage === 'group'){
@@ -4063,7 +4135,7 @@ function assignTeam(chosenGroup, chosenName){
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
-          stayUpChain:false, stayUpPush:false };
+          stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
   state.flags.medicalDirect = medicalDirect;
   if(medicalDirect) state.flags.medicalSplit = true;
@@ -4446,6 +4518,7 @@ function chooseOption(ev, i){
   if(c.ignoreDoctor){ state.ignoreDoctorCount = (state.ignoreDoctorCount || 0) + 1; }
   if(c.stayUp){ state.flags.stayUpChain = true; }   // 熬夜看球：下一个事件必定是体测 / 晨训加练
   if(c.pushHard && ev && ev.stayUpChain){ state.flags.stayUpPush = true; }   // 熬夜后仍拼尽全力
+  if(c.fatigueMatch){ state.flags.fatiguedMatch = true; }   // 值夜班：下一场比赛受伤风险 +1
   addLog(`${ev.title}：${c.text}`);
 
   // 概率选项（新格式）
