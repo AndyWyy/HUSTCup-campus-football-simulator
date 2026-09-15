@@ -1313,7 +1313,7 @@ const PHARMACY_TRACKS = [
    6. 学业值低于 55 时，学业类事件出现率提升 20%
    7. 学业值低于 55 时，涉及学业变动的事件选项成功率提升 25%（上限 100%）
    8. 学业值低于 55 时，每年必定出现一次「学业警告」事件
-   9. 学业警告事件中选择「放弃挣扎」，成功率提升 40%
+   9. 学业警告事件中选择「放弃挣扎」，成功率提高 40 个百分点（例如 47.5% → 87.5%）
    10.「放弃挣扎」判定成功后，不再触发退学结局，也不再因学业值过低而扣心态 */
 const BIO_PHARMACY = '生物药学';
 const BIO_PHARMACY_EVENT_WEIGHT_SCALE = 1.30;   // 学业类事件权重倍率（按实测占比校准到比同济组 +10%）
@@ -1325,7 +1325,7 @@ const BIO_PHARMACY_BREAKDOWN_MENTALITY = 35;    // 心态崩溃线
 const BIO_PHARMACY_LOW_ACADEMY_TIP = '由于学业值低于 55，心态额外 -1';
 const BIO_PHARMACY_LOW_ACADEMY_EVENT_SCALE = 1.88;   // 低学业时学业类事件权重倍率（按实测占比校准到 +20%）
 const BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE = 1.25;     // 低学业时学业变动选项成功率倍率（上限 100%）
-const BIO_PHARMACY_REDEMPTION_PROB_SCALE = 1.4;       // 学业警告「放弃挣扎」成功率倍率
+const BIO_PHARMACY_REDEMPTION_BONUS = 0.4;            // 学业警告「放弃挣扎」成功率加成（40 个百分点）
 function isBioPharmacy(s){
   const t = s || state;
   return !!(t.flags && t.flags.pharmacyTrack === BIO_PHARMACY);
@@ -4399,9 +4399,9 @@ function choiceRollParams(c){
   if(isBioPharmacy() && touchesAcademy(c) && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
     p = Math.min(p * BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE, 1);
   }
-  // 生物药学：学业警告「放弃挣扎」成功率提升 40%（隐藏特性）
+  // 生物药学：学业警告「放弃挣扎」成功率提高 40 个百分点（隐藏特性）
   if(isBioPharmacy() && c.bioRedemption && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
-    p = Math.min(p * BIO_PHARMACY_REDEMPTION_PROB_SCALE, 1);
+    p = Math.min(p + BIO_PHARMACY_REDEMPTION_BONUS, 1);
   }
   const scale = c.fixed ? 1 : 0.8 + sv/100 * 0.7;   // 裁判班使用固定概率与固定效果；普通事件仍与基础数值关联
   return { p, scale };
