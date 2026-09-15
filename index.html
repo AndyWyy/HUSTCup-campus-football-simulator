@@ -646,6 +646,7 @@ const state = {
   squadRole:'首发',   // 首发 / 替补
   injury:null,        // {name,severity,matchesLeft,desc}
   injuryCount:0,
+  ignoreDoctorCount:0,   // 无视队医建议、带伤硬撑的次数
   cards:{ yellow:0, red:0 },
   suspension:{ matchesLeft:0 },
   media:{ fans:50, officials:50, fanMessage:'', officialMessage:'' },
@@ -719,6 +720,7 @@ const ACHIEVEMENTS = [
   {id:'all_rounder', icon:'💎', name:'全能战士', desc:'四维数值全部达到 80', check:s=>Object.values(s.stats).every(v=>v>=80)},
   {id:'academic_elite', icon:'📚', name:'学业巅峰', desc:'学业值达到 90', check:s=>s.stats.academy>=90},
   {id:'iron_comeback', icon:'🛡️', name:'重伤归来', desc:'遭遇重伤后能力仍达到 75', check:s=>s.flags.bigInjury && s.stats.ability>=75},
+  {id:'ignore_doctor', icon:'🩺', name:'别把医生的话当耳边风', desc:'生涯中累计两次无视队医建议、带伤硬撑', check:s=>(s.ignoreDoctorCount||0)>=2},
   {id:'pro_chance', icon:'✈️', name:'职业试训', desc:'获得职业队试训机会', check:s=>s.flags.proTrial},
   {id:'military_service', icon:'🪖', name:'军旅归来', desc:'完成两年服役并保留学籍', check:s=>s.flags.militaryServed},
   {id:'fan_favorite', icon:'🐦', name:'校园顶流', desc:'校内球迷关注度达到 80', check:s=>s.media.fans>=80},
@@ -875,7 +877,7 @@ const REGULAR_EVENTS = [
    desc:'训练中你的旧伤隐隐作痛，队医建议你休息两周。',
    choices:[
      ch('听从队医', 0.85, 'mentality', {mentality:1}, {ability:-1}, '你安心养伤，没有留下隐患。', '你休养期间状态下滑，回来要重新找感觉。'),
-     ch('带伤硬扛', 0.5, 'mentality', {relation:1,ability:1}, {ability:-2,mentality:-2}, '你咬牙坚持，队友很感动。', '你的伤情加重，得不偿失。', {risk:'bigInjury'}),
+     ch('带伤硬扛', 0.5, 'mentality', {relation:1,ability:1}, {ability:-2,mentality:-2}, '你咬牙坚持，队友很感动。', '你的伤情加重，得不偿失。', {risk:'bigInjury', ignoreDoctor:true}),
      ch('科学康复训练', 0.72, 'ability', {ability:1,mentality:1}, {academy:-1}, '你边康复边训练，反而进步了。', '康复训练见效慢，你有些着急。')]},
   {id:'friendly_match', title:'校际友谊赛', cond:s=>true,
    desc:'学院约了一场和兄弟学校的友谊赛，教练来问你的意愿。',
@@ -965,7 +967,7 @@ const REGULAR_EVENTS = [
    desc:'你的旧伤再次隐隐作痛，队医警告你，再不重视可能留下终身隐患。',
    choices:[
      ch('彻底休养', 0.8, 'mentality', {mentality:1}, {ability:-2}, '你彻底休养，根治了旧伤。', '你休养太久，球感全无。'),
-     ch('边踢边治', 0.45, 'ability', {ability:1,mentality:1}, {ability:-3,mentality:-2}, '你带伤坚持，侥幸撑了过去。', '旧伤彻底爆发，你不得不长期缺阵。', {risk:'bigInjury'}),
+     ch('边踢边治', 0.45, 'ability', {ability:1,mentality:1}, {ability:-3,mentality:-2}, '你带伤坚持，侥幸撑了过去。', '旧伤彻底爆发，你不得不长期缺阵。', {risk:'bigInjury', ignoreDoctor:true}),
      ch('科学康复', 0.7, 'ability', {ability:1,mentality:1}, {academy:-1}, '你科学康复，身体反而更强了。', '康复进度缓慢，你心态崩了。')]},
   {id:'coach_change', title:'换教练', cond:s=>true,
    desc:'带队多年的老教练被调走，新教练崇尚高强度高压，你的踢法完全不对他胃口。',
@@ -4030,6 +4032,7 @@ function assignTeam(chosenGroup, chosenName){
   state.squadRole = '首发';
   state.injury = null;
   state.injuryCount = 0;
+  state.ignoreDoctorCount = 0;
   state.cards = { yellow:0, red:0 };
   state.suspension = { matchesLeft:0 };
   state.media = { fans:50, officials:50, fanMessage:'', officialMessage:'' };
@@ -4413,6 +4416,7 @@ function chooseOption(ev, i){
   if(c.path){ state.path = c.path==='深造-保研' ? (Math.random()<0.5?'读研':'直博') : c.path; }
   if(c.bigInjury){ state.flags.bigInjury=true; state.repeatYear=true; }
   if(c.extendGraduation){ state.flags.extendGraduation=true; }
+  if(c.ignoreDoctor){ state.ignoreDoctorCount = (state.ignoreDoctorCount || 0) + 1; }
   addLog(`${ev.title}：${c.text}`);
 
   // 概率选项（新格式）
