@@ -664,7 +664,8 @@ const state = {
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
-          pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false },
+          pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
+          stayUpChain:false, stayUpPush:false },
   achievements:{},
   achievementClaimed:false,
   achievementPromptShown:false,
@@ -721,6 +722,7 @@ const ACHIEVEMENTS = [
   {id:'academic_elite', icon:'📚', name:'学业巅峰', desc:'学业值达到 90', check:s=>s.stats.academy>=90},
   {id:'iron_comeback', icon:'🛡️', name:'重伤归来', desc:'遭遇重伤后能力仍达到 75', check:s=>s.flags.bigInjury && s.stats.ability>=75},
   {id:'ignore_doctor', icon:'🩺', name:'别把医生的话当耳边风', desc:'生涯中累计两次无视队医建议、带伤硬撑', check:s=>(s.ignoreDoctorCount||0)>=2},
+  {id:'outrun_you', icon:'🏃', name:'你跑不过我你信不信（记得爱惜自己）', desc:'熬夜看完球后，紧接着在体测或晨训加练里拼尽全力', check:s=>!!s.flags.stayUpPush},
   {id:'pro_chance', icon:'✈️', name:'职业试训', desc:'获得职业队试训机会', check:s=>s.flags.proTrial},
   {id:'military_service', icon:'🪖', name:'军旅归来', desc:'完成两年服役并保留学籍', check:s=>s.flags.militaryServed},
   {id:'fan_favorite', icon:'🐦', name:'校园顶流', desc:'校内球迷关注度达到 80', check:s=>s.media.fans>=80},
@@ -791,7 +793,7 @@ const REGULAR_EVENTS = [
   {id:'extra_training', title:'晨训加练', cond:s=>true,
    desc:'教练宣布明天清晨六点加练体能。天还没亮，你已经在宿舍门口犹豫了。',
    choices:[
-     ch('咬牙坚持', 0.7, 'mentality', {ability:2,mentality:1}, {ability:-1,mentality:-1,academy:-1}, '你成了最早到场的球员，教练记住了你的名字。', '你咬牙跟完全程，却在随后的训练里疲惫不堪、频频走神。'),
+     ch('咬牙坚持', 0.7, 'mentality', {ability:2,mentality:1}, {ability:-1,mentality:-1,academy:-1}, '你成了最早到场的球员，教练记住了你的名字。', '你咬牙跟完全程，却在随后的训练里疲惫不堪、频频走神。', {pushHard:true}),
      ch('正常训练', 0.92, 'mentality', {mentality:1}, {mentality:-1}, '你按部就班完成训练，状态平稳。', '训练平平无奇，你也没什么长进。'),
      ch('睡个懒觉', 0.85, 'mentality', {mentality:1,academy:1}, {ability:-1}, '你多睡了两小时，精神饱满地迎接这一天。', '你睡过了头，被教练点名批评。')]},
   {id:'tactics_video', title:'战术录像课', cond:s=>true,
@@ -906,7 +908,7 @@ const REGULAR_EVENTS = [
   {id:'fitness_test', title:'体能测试', cond:s=>true,
    desc:'学院组织年度体能测试，成绩会记入教练的印象分。',
    choices:[
-     ch('全力冲刺', 0.7, 'ability', {ability:1,mentality:1}, {mentality:-1}, '你跑出队里前三，教练很满意。', '你拼得太狠，抽筋倒地，有些丢脸。'),
+     ch('全力冲刺', 0.7, 'ability', {ability:1,mentality:1}, {mentality:-1}, '你跑出队里前三，教练很满意。', '你拼得太狠，抽筋倒地，有些丢脸。', {pushHard:true}),
      ch('稳步完成', 0.85, 'mentality', {mentality:1}, {ability:-1}, '你稳定发挥，成绩中规中矩。', '你太求稳，成绩平平。'),
      ch('悄悄保存体力', 0.6, 'mentality', {academy:1,mentality:1}, {relation:-1}, '你留了力气，测试后还能学习。', '你被队友看出在偷懒，形象受损。')]},
   {id:'playmaker', title:'组织核心', cond:s=>true,
@@ -1115,16 +1117,25 @@ function eventDrawWeight(ev){
   }
   return w;
 }
-/* 同济医学院组的学生从大二起不再考高数，改考系统解剖学，且判定成功率降低 20%（最低 5%） */
+/* 同济医学院组的学生从大二起不再考高数：
+   大二 系统解剖学 / 大三 药理学 / 大四及以后 内科、外科、儿科、妇科（四个科目随机出现，平分该事件的出现概率）
+   判定成功率降低 20%（最低 5%） */
 const TONGJI_EXAM_EVENT_ID = 'fail_crisis';
 const TONGJI_EXAM_PROB_SCALE = 0.8;
+const TONGJI_CLINICAL_EXAMS = ['内科','外科','儿科','妇科'];
+function tongjiExamNameForYear(year){
+  if(year <= 1) return '系统解剖学';      // 大二
+  if(year === 2) return '药理学';         // 大三
+  return pick(TONGJI_CLINICAL_EXAMS);     // 大四及以后：内科 / 外科 / 儿科 / 妇科
+}
 function adaptEventForPlayer(ev){
   if(ev.id !== TONGJI_EXAM_EVENT_ID) return ev;
   if(!isTongjiPlayer() || state.year < 1) return ev;
+  const examName = tongjiExamNameForYear(state.year);
   return {
     ...ev,
-    title: '系统解剖学考试',
-    desc: ev.desc.replace(/高数/g, '系统解剖学'),
+    title: `${examName}考试`,
+    desc: ev.desc.replace(/高数/g, examName),
     choices: ev.choices.map(c => ({
       ...c,
       prob: undefined,
@@ -1552,7 +1563,7 @@ function randomSpecialEvents(s){
     list.push({tag:'非赛事期 · 熬夜看球', title:`熬夜看球 · ${match.name}`, auto:false,
       desc:`${match.name}在${match.time}开打，正好最近球队没有比赛。你要不要熬夜观看？`,
       choices:[
-        ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。'),
+        ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。', {stayUp:true}),
         ch('只看半场', 0.75, 'mentality', {mentality:1}, {ability:-1}, '你只看半场后休息，既过了瘾又保留了状态。', '你没能忍住，还是看完了下半场。'),
         ch('早点休息', 0.85, 'mentality', {academy:1, mentality:1}, {}, '你放弃看球，早早休息，保持了学习和训练状态。', '你心里一直惦记比赛，反而没睡好。')
       ]});
@@ -1562,7 +1573,7 @@ function randomSpecialEvents(s){
     list.push({tag:'世界杯 · 熬夜看球', title:`世界杯${stage}`, auto:false,
       desc:`${s.calendarYear || 2026}年是世界杯年，今晚${stage}在深夜开打。你要不要熬夜观看？`,
       choices:[
-        ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。'),
+        ch('熬夜看完', 0.55, 'mentality', {ability:1, mentality:1}, {ability:-1, mentality:-1, academy:-2}, '你熬夜看完整场，从高水平比赛中看出不少细节。', '你熬夜看球，第二天训练和上课都昏昏沉沉。', {stayUp:true}),
         ch('只看半场', 0.75, 'mentality', {mentality:1}, {ability:-1}, '你只看半场后休息，既过了瘾又保留了状态。', '你没能忍住，还是看完了下半场。'),
         ch('早点休息', 0.85, 'mentality', {academy:1, mentality:1}, {}, '你放弃看球，早早休息，保持了学习和训练状态。', '你心里一直惦记比赛，反而没睡好。')
       ]});
@@ -2010,7 +2021,7 @@ const BETWEEN_MATCH_EVENTS = [
   },
   {tag:'华工杯间歇 · 熬夜看球', title:'凌晨三点的欧冠', only:'华工杯', desc:'华工杯期间，凌晨三点有一场关键欧冠比赛。你要不要熬夜看完？',
    choices:[
-    {text:'熬夜看完', effect:{}, result:'', resolve:s=>{
+    {text:'熬夜看完', effect:{}, result:'', stayUp:true, resolve:s=>{
       if(Math.random() < 0.55) return {effect:{ability:1, mentality:1}, result:'你熬夜看完整场，从高水平比赛中看出不少细节。'};
       return {effect:{ability:-1, mentality:-1, academy:-1}, result:'你熬夜看球，第二天训练和上课都昏昏沉沉。'};
     }},
@@ -2049,6 +2060,7 @@ function showEasterEgg(ev, onDone){
       let eff = c.effect || {};
       let result = c.result || '';
       const drained = bioPharmacyChoiceDrain();
+      if(c.stayUp) state.flags.stayUpChain = true;   // 熬夜看球：下一个事件必定是体测 / 晨训加练
       if(c.resolve){ const r = c.resolve(state); eff = r.effect || eff; result = r.result || result; }
       const actual = applyStats(eff);
       checkAchievements(state);
@@ -4050,7 +4062,8 @@ function assignTeam(chosenGroup, chosenName){
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
-          pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false };
+          pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
+          stayUpChain:false, stayUpPush:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
   state.flags.medicalDirect = medicalDirect;
   if(medicalDirect) state.flags.medicalSplit = true;
@@ -4117,6 +4130,12 @@ function hintText(){
 
 /* ---------------- 学年流程 ---------------- */
 /* 里程碑触发时机：开始型（新生杯、队长竞选）在年度开始；结束型（升学、毕业、读博抉择、答辩）在年度结束 */
+/* 熬夜看球后的连锁事件：体测或晨训加练，二选一 */
+function stayUpChainedTrainingEvent(){
+  const id = Math.random() < 0.5 ? 'fitness_test' : 'extra_training';
+  const base = REGULAR_EVENTS.find(e => e.id === id);
+  return base ? { tag:'常规事件', ...base, stayUpChain:true } : null;
+}
 function isEndMilestone(s){
   const y = s.year;
   const undergradYears = s.medical ? 5 : 4;
@@ -4143,6 +4162,7 @@ function medicalHomeIdentityHooks(){
 
 function startYear(){
   state.repeatYear = false;
+  state.flags.stayUpChain = false;   // 熬夜连锁只在同一学年内生效
   queue = [];
   current = null;
   const year = state.year;
@@ -4238,6 +4258,12 @@ function processQueue(){
   if(queue.length === 0){ return yearEnd(); }
   const item = queue.shift();
   state.yearPlanDone++;
+  // 熬夜看球连锁：本学年下一个事件必定是体测或晨训加练
+  if(item.type === 'event' && state.flags.stayUpChain){
+    state.flags.stayUpChain = false;
+    const forced = stayUpChainedTrainingEvent();
+    if(forced) item.ev = forced;
+  }
   if(item.type === 'supercup' || item.type === 'supercup-preview'){
     if(item.cond && !item.cond(state)){ return processQueue(); }
     launchSuperCup(item.type === 'supercup-preview');
@@ -4417,6 +4443,8 @@ function chooseOption(ev, i){
   if(c.bigInjury){ state.flags.bigInjury=true; state.repeatYear=true; }
   if(c.extendGraduation){ state.flags.extendGraduation=true; }
   if(c.ignoreDoctor){ state.ignoreDoctorCount = (state.ignoreDoctorCount || 0) + 1; }
+  if(c.stayUp){ state.flags.stayUpChain = true; }   // 熬夜看球：下一个事件必定是体测 / 晨训加练
+  if(c.pushHard && ev && ev.stayUpChain){ state.flags.stayUpPush = true; }   // 熬夜后仍拼尽全力
   addLog(`${ev.title}：${c.text}`);
 
   // 概率选项（新格式）
