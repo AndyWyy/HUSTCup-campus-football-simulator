@@ -1107,7 +1107,7 @@ function weightedShuffle(list, weightFn){
 }
 /* 同济医学院组的学生课业更重，校园事件里更容易出现学业相关的选项；生物药学再高约 10%；
    生物药学学业值低于 55 时，学业类事件权重再提升 20% */
-const TONGJI_ACADEMIC_EVENT_WEIGHT = 1.6;
+const TONGJI_ACADEMIC_EVENT_WEIGHT = 1.4;
 function eventDrawWeight(ev){
   if(!isTongjiPlayer() || !hasAcademyBoost(ev)) return 1;
   let w = TONGJI_ACADEMIC_EVENT_WEIGHT;
@@ -1323,7 +1323,7 @@ const BIO_PHARMACY_LOW_ACADEMY = 55;            // 学业值警戒线（低学�
 const BIO_PHARMACY_LOW_ACADEMY_DRAIN = -1;      // 每次事件抉择额外扣除的心态
 const BIO_PHARMACY_BREAKDOWN_MENTALITY = 35;    // 心态崩溃线
 const BIO_PHARMACY_LOW_ACADEMY_TIP = '由于学业值低于 55，心态额外 -1';
-const BIO_PHARMACY_LOW_ACADEMY_EVENT_SCALE = 1.88;   // 低学业时学业类事件权重倍率（按实测占比校准到 +20%）
+const BIO_PHARMACY_LOW_ACADEMY_EVENT_SCALE = 1.72;   // 低学业时学业类事件权重倍率（按实测占比校准到 +20%）
 const BIO_PHARMACY_LOW_ACADEMY_PROB_SCALE = 1.25;     // 低学业时学业变动选项成功率倍率（上限 100%）
 const BIO_PHARMACY_REDEMPTION_BONUS = 0.4;            // 学业警告「放弃挣扎」成功率加成（40 个百分点）
 function isBioPharmacy(s){
