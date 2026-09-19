@@ -309,3 +309,13 @@ https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 欢迎提出 Issue 或 Pull Request。
 
 更新记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 回归测试
+
+安装 Node.js 22 或更新版本后，在项目目录执行：
+
+```sh
+node --test tests/regressions.test.cjs
+```
+
+测试直接运行页面内的游戏脚本，覆盖存档迁移、生涯学制、赛事资格、事件队列和全成就登记工作流；无需安装 npm 依赖。测试使用独立的内存存档，不会修改浏览器中的玩家存档。
