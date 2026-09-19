@@ -317,6 +317,7 @@
       <div class="field"><input id="nameInput" type="text" placeholder="请输入你的姓名" maxlength="8" autocomplete="off"></div>
     </div>
     <div class="spacer"></div>
+    <p class="kicker" title="本游戏页面的累计访问次数，刷新也会计数"><span id="busuanzi_container_page_pv" style="display:none;">⚽ 累计访问 <span id="busuanzi_value_page_pv"></span> 次</span></p>
     <button class="btn gold mt16" id="btnName" disabled>开启录取通知书</button>
     <button class="btn ghost mt16" id="btnContinue" style="display:none;">继续上次存档</button>
     <button class="btn ghost mt16" id="btnClearSave" style="display:none;">清除本机存档</button>
@@ -4942,6 +4943,13 @@ setupRevealToggle();
 setupAchievementClaim();
 initName();
 show('scr-notice');
+// 仅正式站点加载统计，避免本地调试和预览产生无意义的计数。
+if(location.hostname === 'fantasicrap.github.io'){
+  const counterScript = document.createElement('script');
+  counterScript.async = true;
+  counterScript.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+  document.head.appendChild(counterScript);
+}
 </script>
 </body>
 </html>

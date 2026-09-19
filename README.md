@@ -16,6 +16,15 @@ GitHub 仓库：
 
 https://github.com/Fantasicrap/HUSTCup-campus-football-simulator
 
+## 访问量统计
+
+初始录取通知书页面显示本游戏页面的累计访问次数，由[不蒜子](https://busuanzi.ibruce.info/)提供，无需配置数据库或密钥。
+
+- 统计的是页面访问次数（PV），不是独立玩家人数；刷新页面也会计数，游戏内切换界面不会额外请求统计。
+- 使用页面级 `page_pv`，避免混入同一 GitHub Pages 域名下其他项目的访问量；不同访问 URL 的计数可能不同，建议使用上方固定网址。
+- 仅在正式域名 `fantasicrap.github.io` 加载统计脚本；本地运行和其他域名的预览不加载。迁移域名时需修改此判断。
+- 数据由第三方统计服务维护，无法补回接入前未被记录的访问；加载中、离线或服务不可用时不显示计数，不影响游戏。
+
 ## 本地运行
 
 1. 保持 `index.html`、`甲组球队logo`、`乙组球队logo` 在同一个文件夹中。
