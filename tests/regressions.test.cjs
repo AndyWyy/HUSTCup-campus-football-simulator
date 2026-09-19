@@ -109,11 +109,11 @@ test('clinical captain receives a temporary home identity even after same-year s
 test('old saves receive missing rosters, flags and Super Cup champions', () => {
   const { run } = game();
   run(`const old=JSON.parse(JSON.stringify(state));old.year=1;delete old.seasonChampions;
-    delete old.rosters['同济组'];delete old.flags.farewellDone;
+    delete old.rosters['同济组'];delete old.flags.warmedUpMatch;
     localStorage.setItem(SAVE_KEY,JSON.stringify({state:old}));`);
   assert.equal(run('loadGame()'), true);
   assert.equal(run("state.rosters['同济组'].length"), 8);
-  assert.equal(run('state.flags.farewellDone'), false);
+  assert.equal(run('state.flags.warmedUpMatch'), false);
   assert.doesNotThrow(() => run('startYear();'));
   assert.equal(run('tourney.type'), '超级杯');
 });
@@ -181,4 +181,21 @@ test('achievement workflow treats titles as data and appends each exact name onl
     assert.deepEqual(readFileSync(join(dir,'FULL_ACHIEVERS.md'),'utf8').trim().split('\n'),[
       '# 玩家','- '+title.replace('全成就玩家登记：',''),'- 测试','- 测试玩家']);
   } finally { rmSync(dir,{recursive:true,force:true}); }
+});
+
+
+test('medical final year keeps the graduation cup without the removed farewell event', () => {
+  const { run } = game();
+  run("assignTeam('同济组','法医学系');state.year=4;processQueue=()=>{};startYear();");
+  assert.equal(run("queue.filter(x=>x.tourney==='毕业杯').length"), 1);
+  assert.equal(run("queue.some(x=>x.ev && x.ev.title==='大五告别战')"), false);
+  assert.equal(run('typeof farewellMatchEvent'), 'undefined');
+});
+
+test('archive achievements count for an older career and newly unlocked goals persist immediately', () => {
+  const { run } = game();
+  run("state.achievements.first_goal=true;inheritAchievements();state.achievements={};");
+  assert.equal(run('achievementCount()'), 1);
+  run('state.careerGoals=20;checkAchievements(state);');
+  assert.equal(run('loadInheritedAchievements().goal_hunter'), true);
 });
