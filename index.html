@@ -249,6 +249,10 @@
   .ach-item .ach-icon{font-size:20px; line-height:1; margin-bottom:5px;}
   .ach-item .ach-name{font-size:10px; line-height:1.3; color:var(--ink); font-weight:700;}
   .ach-item.unlocked{border-color:rgba(245,196,81,.55); background:linear-gradient(150deg,rgba(245,196,81,.12),var(--card2));}
+  .ach-item.inherited{border-color:var(--line); filter:grayscale(1); opacity:.7;}
+  .ach-item.inherited .ach-name{color:var(--sub);}
+  .ach-status{font-size:9px; margin-top:5px; color:var(--sub);}
+  .ach-item.unlocked .ach-status{color:var(--gold);}
   .ach-item.locked{opacity:.45; filter:grayscale(.8);}
   .ach-item.locked .ach-icon{color:var(--sub);}
   .ach-item.locked .ach-name{color:var(--sub);}
@@ -684,6 +688,7 @@ const state = {
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
           stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false },
   achievements:{},
+  achievementScopeVersion:2, // achievements 只记录本档，历史记录单独保存
   achievementClaimed:false,
   achievementPromptShown:false,
   showChoiceDetails:false,
@@ -752,6 +757,14 @@ function loadGame(){
     state.calendarYear = state.calendarYear || 2026;
     state.media = state.media || { fans:50, officials:50, fanMessage:'', officialMessage:'' };
     state.championColleges = state.championColleges || {};
+    if(data.state.achievementScopeVersion !== 2){
+      // 旧档混合了本档和历史成就，先归档全部荣誉，再确认本档达成项。
+      inheritAchievements();
+      state.achievements = Object.fromEntries(ACHIEVEMENTS
+        .filter(a => state.achievements && state.achievements[a.id] && a.check(state))
+        .map(a => [a.id, true]));
+    }
+    state.achievementScopeVersion = 2;
     return true;
   }catch(e){ return false; }
 }
@@ -820,12 +833,19 @@ function achievementCount(){
 
 function renderAchievements(summaryId, gridId){
   if(!$(summaryId) || !$(gridId)) return;
-  $(summaryId).innerHTML = `已解锁 <b>${achievementCount()} / ${ACHIEVEMENTS.length}</b>`;
+  const inherited = loadInheritedAchievements();
+  const currentCount = ACHIEVEMENTS.filter(a => state.achievements[a.id]).length;
+  $(summaryId).innerHTML = `本档解锁 <b>${currentCount} / ${ACHIEVEMENTS.length}</b> · 累计解锁 <b>${achievementCount()} / ${ACHIEVEMENTS.length}</b>`;
   $(gridId).innerHTML = ACHIEVEMENTS.map(a=>{
-    const on = !!state.achievements[a.id] || !!loadInheritedAchievements()[a.id];
-    return `<div class="ach-item ${on?'unlocked':'locked'}" title="${on?a.desc:'尚未解锁'}">
-      <div class="ach-icon">${on?a.icon:'?'}</div>
-      <div class="ach-name">${on?a.name:'？？？'}</div>
+    const current = !!state.achievements[a.id];
+    const historical = !!inherited[a.id];
+    const known = current || historical;
+    const status = current ? '本档已解锁' : (historical ? '历史已解锁' : '尚未解锁');
+    const cls = current ? 'unlocked' : (historical ? 'inherited' : 'locked');
+    return `<div class="ach-item ${cls}" title="${known ? status + '：' + a.desc : status}">
+      <div class="ach-icon">${known?a.icon:'?'}</div>
+      <div class="ach-name">${known?a.name:'？？？'}</div>
+      <div class="ach-status">${status}</div>
     </div>`;
   }).join('');
 }
@@ -4288,7 +4308,8 @@ function assignTeam(chosenGroup, chosenName){
   state.injuryShieldYears = 0;
   state.cupSeasonCount = 0;
   state.championColleges = {};
-  state.achievements = Object.assign({}, loadInheritedAchievements());   // 继承以往周目已解锁的成就
+  state.achievements = {}; // 新档从零记录，历史荣誉通过独立档案展示
+  state.achievementScopeVersion = 2;
   state.achievementClaimed = false;
   state.achievementPromptShown = false;
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
