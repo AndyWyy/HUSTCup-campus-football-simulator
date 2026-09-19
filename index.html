@@ -686,6 +686,7 @@ const state = {
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
+          metWeiShihao:false, metXuBin:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
           stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false },
   achievements:{},
@@ -2269,13 +2270,17 @@ const BETWEEN_MATCH_EVENTS = [
 ];
 
 function rollEasterEgg(){
+  const weiChance = state.flags.metWeiShihao ? 0 : 0.05;
+  const xuChance = state.flags.metXuBin ? 0 : 0.05;
   const r = Math.random();
-  if(r < 0.05) return EASTER_EVENTS[0];
-  if(r < 0.10) return EASTER_EVENTS[1];
+  if(r < weiChance) return EASTER_EVENTS[0];
+  if(r < weiChance + xuChance) return EASTER_EVENTS[1];
   return null;
 }
 
 function showEasterEgg(ev, onDone){
+  if(ev.name === '韦世豪') state.flags.metWeiShihao = true;
+  if(ev.name === '徐彬') state.flags.metXuBin = true;
   show('scr-event');
   $('evNum').textContent = state.number;
   $('evName').textContent = state.name;
@@ -4318,6 +4323,7 @@ function assignTeam(chosenGroup, chosenName){
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
+                  metWeiShihao:false, metXuBin:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
           stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
