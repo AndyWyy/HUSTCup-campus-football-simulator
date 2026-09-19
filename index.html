@@ -932,7 +932,7 @@ const REGULAR_EVENTS = [
      ch('课余打工', 0.65, 'mentality', {mentality:1,relation:1}, {academy:-1,ability:-1}, '你挤出时间打工，钱包鼓了，人也更懂事。', '打工太累，训练和学习都受了影响。'),
      ch('省着点花', 0.88, 'mentality', {mentality:1}, {mentality:-1}, '你精打细算，把时间都留给了训练。', '你过得紧巴巴，心里有些委屈。'),
      ch('申请助学金', 0.6, 'academy', {academy:1,relation:1}, {mentality:-1}, '你申请到了助学金，减轻了负担。', '申请没通过，你有些失落。')]},
-  {id:'old_injury', title:'旧伤复发', cond:s=>true,
+  {id:'old_injury', title:'旧伤复发', cond:s=>(s.injuryShieldYears || 0) <= 0,
    desc:'训练中你的旧伤隐隐作痛，队医建议你休息两周。',
    choices:[
      ch('听从队医', 0.85, 'mentality', {mentality:1}, {ability:-1}, '你安心养伤，没有留下隐患。', '你休养期间状态下滑，回来要重新找感觉。'),
@@ -1022,7 +1022,7 @@ const REGULAR_EVENTS = [
      ch('请假回家', 0.8, 'mentality', {mentality:1,relation:1}, {ability:-1,academy:-1}, '你回家陪了家人，心里踏实了。', '你耽误了训练和课程，回来要补很多。'),
      ch('继续留校', 0.55, 'ability', {ability:2}, {mentality:-3}, '你咬牙留在学校，把痛苦发泄在球场。', '你心神不宁，训练比赛都一团糟。'),
      ch('两头兼顾', 0.6, 'mentality', {mentality:1,academy:1}, {mentality:-2,ability:-1}, '你抽空回家又赶回训练，两边没耽误。', '你奔波劳碌，身心俱疲。')]},
-  {id:'injury_recur', title:'伤病反复', cond:s=>true,
+  {id:'injury_recur', title:'伤病反复', cond:s=>(s.injuryShieldYears || 0) <= 0,
    desc:'你的旧伤再次隐隐作痛，队医警告你，再不重视可能留下终身隐患。',
    choices:[
      ch('彻底休养', 0.8, 'mentality', {mentality:1}, {ability:-2}, '你彻底休养，根治了旧伤。', '你休养太久，球感全无。'),
@@ -1289,7 +1289,7 @@ function ensureAcademicEvents(shuffled, before, after, target){
   const candidates = shuffled.filter(e => isAcademicEvent(e) && !combined.includes(e));
   for(let i = combined.length - 1; i >= 0 && count < target && candidates.length; i--){
     if(!isAcademicEvent(combined[i])){
-      combined[i] = candidates.shift();
+      combined[i] = { tag:'常规事件', ...candidates.shift() };
       count++;
     }
   }
@@ -2447,6 +2447,7 @@ function launchTournament(type, role, onDone){
     myGroup: groups.find(g => g.teams.includes(state.team.name)),
     playerGoals: 0, playerAssists: 0,
     playerYellows: 0,
+    playerMadeSquad: false,
     stage: 'group',
     knockoutRounds: null, koRoundIdx: 0, koMatchIdx: 0,
     matchMin: 0, liveHome: 0, liveAway: 0,
@@ -2704,6 +2705,7 @@ function prepareMatch(match, isKey, unavailable=false){
   t.matchPlayerGoals = 0;
   t.matchInjuryRisk = 0;
   t.playerUnavailable = unavailable;
+  if(t.role !== 'coach' && !unavailable) t.playerMadeSquad = true;
   // 基础比分
   const myName = state.team.name;
   const opp = match.home === myName ? match.away : match.home;
@@ -3000,7 +3002,7 @@ function finishTournament(){
   const t = tourney;
   const myName = state.team.name;
   if(t.type === '华工杯'){
-    state.cupSeasonCount++;
+    if(t.role !== 'coach' && t.playerMadeSquad) state.cupSeasonCount++;
     state.seasonChampions = state.seasonChampions || initialSeasonChampions();
     const lastRound = t.knockoutRounds ? t.knockoutRounds[t.knockoutRounds.length - 1] : null;
     const ownChampion = lastRound && lastRound[0] ? lastRound[0].winner : null;

@@ -2,33 +2,55 @@ name: Full Achievers
 
 on:
   issues:
-    types: [labeled]
+    types: [opened]
 
 permissions:
   contents: write
-  issues: read
+  issues: write
+
+concurrency:
+  group: full-achievers-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
-  update-list:
-    if: github.event.label.name == 'full-achievement'
+  register:
+    if: startsWith(github.event.issue.title, '全成就玩家登记')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Append achiever to list
-        shell: bash
+      - name: Update full achievers list
+        id: update
         env:
           ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: node .github/scripts/update-full-achievers.mjs
+
+      - name: Publish updated list
+        if: steps.update.outputs.status == 'added'
         run: |
-          raw_title="$ISSUE_TITLE"
-          name="${raw_title#全成就玩家登记：}"
-          name="${name:-${raw_title}}"
-          line="- ${name}"
-          if ! grep -Fxq -- "$line" FULL_ACHIEVERS.md; then
-            printf '%s\n' "$line" >> FULL_ACHIEVERS.md
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add FULL_ACHIEVERS.md
-            git commit -m "Add full achiever: ${name}" || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add FULL_ACHIEVERS.md
+          if git diff --cached --quiet -- FULL_ACHIEVERS.md; then
+            echo "No changes to publish."
+          else
+            git commit -m "Register full achiever"
             git push
+          fi
+
+      - name: Complete registration issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          STATUS: ${{ steps.update.outputs.status }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --add-label "full-achievement"
+          if [ "$STATUS" = "added" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body "登记成功，名单已更新：[FULL_ACHIEVERS.md](https://github.com/$GITHUB_REPOSITORY/blob/main/FULL_ACHIEVERS.md)"
+            gh issue close "$ISSUE_NUMBER"
+          elif [ "$STATUS" = "duplicate" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body "这个名字已经在全成就名单中，感谢你的登记。"
+            gh issue close "$ISSUE_NUMBER"
+          else
+            gh issue comment "$ISSUE_NUMBER" --body "登记标题格式不正确，请使用“全成就玩家登记：你的 ID 或名字”。"
           fi

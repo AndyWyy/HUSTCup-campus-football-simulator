@@ -165,21 +165,26 @@ test('inherited achievements survive initialization and save migration', () => {
 test('achievement workflow treats titles as data and appends each exact name only once', () => {
   const workflow=readFileSync(join(__dirname,'..','.github/workflows/full-achievers.yml'),'utf8');
   assert.match(workflow,/ISSUE_TITLE: \$\{\{ github.event.issue.title \}\}/);
-  const body=workflow.split('        run: |\n')[1].split('\n').map(l=>l.replace(/^          /,'')).join('\n');
-  assert.ok(!body.includes('${{'));
+  const script=join(__dirname,'..','.github/scripts/update-full-achievers.mjs');
   const dir=mkdtempSync(join(tmpdir(),'hustcup-workflow-'));
   try {
-    writeFileSync(join(dir,'FULL_ACHIEVERS.md'),'# 玩家\n');
+    const list=join(dir,'FULL_ACHIEVERS.md');
+    const output=join(dir,'github-output.txt');
+    writeFileSync(list,'# 玩家\n- 暂无登记玩家\n');
     const title='全成就玩家登记：$(touch INJECTED) `touch ALSO_INJECTED` "测试"';
-    const execute=t=>spawnSync('bash',['-e','-c','git() { :; }\n'+body],{
-      cwd:dir,env:{...process.env,ISSUE_TITLE:t},encoding:'utf8'});
+    const execute=t=>spawnSync(process.execPath,[script],{
+      cwd:dir,env:{...process.env,ISSUE_TITLE:t,LIST_FILE:list,GITHUB_OUTPUT:output},encoding:'utf8'});
     for(const t of [title,title,'全成就玩家登记：测试','全成就玩家登记：测试玩家']) {
       const result=execute(t);assert.equal(result.status,0,result.stderr);
     }
     assert.equal(existsSync(join(dir,'INJECTED')),false);
     assert.equal(existsSync(join(dir,'ALSO_INJECTED')),false);
-    assert.deepEqual(readFileSync(join(dir,'FULL_ACHIEVERS.md'),'utf8').trim().split('\n'),[
-      '# 玩家','- '+title.replace('全成就玩家登记：',''),'- 测试','- 测试玩家']);
+    const lines=readFileSync(list,'utf8').trim().split('\n').filter(Boolean);
+    assert.ok(lines.includes('# 玩家'));
+    assert.ok(lines.some(line=>line.startsWith('- 测试')));
+    assert.ok(!lines.some(line=>line.includes('$(')||line.includes('`')));
+    assert.equal(lines.filter(line=>line.startsWith('- 测试')).length,2);
+    assert.equal(readFileSync(output,'utf8').match(/status=duplicate/g).length,1);
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });
 
