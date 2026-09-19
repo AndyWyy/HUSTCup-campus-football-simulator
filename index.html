@@ -676,7 +676,7 @@ const state = {
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
-          stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false, farewellDone:false },
+          stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false },
   achievements:{},
   achievementClaimed:false,
   achievementPromptShown:false,
@@ -1476,22 +1476,6 @@ function pharmacyTrackEvent(s){
       }
     }))
   };
-}
-
-/* ---------------- 医学大五告别战 ---------------- */
-/* 五年制医学类学生在毕业杯之前的专属事件 */
-function farewellMatchEvent(s){
-  if(!s.medical || s.year !== 4 || s.flags.farewellDone) return null;
-  return {tag:'医学大五 · 告别战', title:'大五告别战', auto:false,
-    desc:'医学大五的最后一个学期，毕业杯就在眼前。宿舍柜子里，白大褂和球鞋摆在一起，你只能带走一样去球场。',
-    choices:[
-      {text:'带上白大褂', flag:'farewellDone', effect:{mentality:1, relation:1},
-       result:'你把白大褂叠好带去了球场，队友笑你"人还没毕业，心已经进科里了"。'},
-      {text:'只带球鞋', flag:'farewellDone', effect:{ability:1, mentality:1},
-       result:'你只带了球鞋。这一天，你只想好好踢一场球。'},
-      {text:'两样都带上', flag:'farewellDone', effect:{mentality:2, academy:-1},
-       result:'白大褂和球鞋都在包里。你知道，这两条路你都还没走完。'}
-    ]};
 }
 
 /* ---------------- 保留学籍服役路径 ---------------- */
@@ -4183,7 +4167,7 @@ function assignTeam(chosenGroup, chosenName){
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
-          stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false, farewellDone:false };
+          stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
   state.flags.medicalDirect = medicalDirect;
   if(medicalDirect) state.flags.medicalSplit = true;
@@ -4359,8 +4343,6 @@ function startYear(){
   const refereeEv = refereeYearEvent(state);
   if(refereeEv) seq.push({ type:'event', ev: refereeEv });
   // 毕业杯（本科毕业年级与深造毕业年级都要参赛）
-  const farewellEv = farewellMatchEvent(state);
-  if(farewellEv) seq.push({ type:'event', ev: farewellEv });   // 医学大五告别战
   const undergradFinal = state.year === (state.medical ? 4 : 3);
   const gradFinal = year === academicYears(state.path, state) - 1;
   if(undergradFinal || gradFinal){
