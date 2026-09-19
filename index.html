@@ -2841,7 +2841,7 @@ function rollMatchInjury(){
   const base = {前锋:0.025, 中场:0.03, 后卫:0.035, 门将:0.018}[state.position] || 0.025;
   // 值夜班（+1）/ 运动防护讲座（−1）的一次性状态修正，只影响本场比赛
   const fatigue = (state.flags.fatiguedMatch ? 1 : 0) - (state.flags.warmedUpMatch ? 1 : 0);
-  const p = clamp(base + ((tourney.matchInjuryRisk || 0) + fatigue) * 0.025 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.008, 0.14);
+  let p = clamp(base + ((tourney.matchInjuryRisk || 0) + fatigue) * 0.025 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.008, 0.14);
   if((state.injuryShieldYears || 0) > 0) p = Math.min(p * 0.15, 0.02);
   if(Math.random() >= p) return;
   const r = Math.random();

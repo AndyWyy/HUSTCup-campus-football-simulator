@@ -204,3 +204,28 @@ test('archive achievements count for an older career and newly unlocked goals pe
   run('state.careerGoals=20;checkAchievements(state);');
   assert.equal(run('loadInheritedAchievements().goal_hunter'), true);
 });
+
+test('simulation button completes matches for every position with and without military injury protection', () => {
+  for (const position of ['前锋', '中场', '后卫', '门将']) {
+    for (const shield of [0, 2]) {
+      const { run } = game();
+      run(`state.position=${JSON.stringify(position)};state.injuryShieldYears=${shield};
+        Math.random=()=>0.5;launchTournament('华工杯','player',()=>{});
+        const match=myMatchesLeft()[0];renderMatchModeChoice(match,false);`);
+      assert.doesNotThrow(() => run("document.getElementById('mModeSim').onclick();"), `${position}, shield=${shield}`);
+      assert.equal(run('match.done'), true);
+      assert.equal(run('Number.isFinite(match.hg) && Number.isFinite(match.ag)'), true);
+      assert.equal(run("typeof document.getElementById('mBtn1').onclick"), 'function');
+    }
+  }
+});
+
+test('military protection reduces injury probability without eliminating injuries', () => {
+  for (const [shield, random, injured] of [[0, 0.01, true], [2, 0.01, false], [2, 0.003, true]]) {
+    const { run } = game();
+    run(`state.stats={ability:60,mentality:60,relation:60,academy:60};
+      state.injuryShieldYears=${shield};tourney={role:'player',matchInjuryRisk:0};Math.random=()=>${random};`);
+    assert.doesNotThrow(() => run('rollMatchInjury();'));
+    assert.equal(run('!!state.injury'), injured);
+  }
+});
