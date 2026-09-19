@@ -1203,6 +1203,23 @@ const REGULAR_EVENTS = [
 function hasAcademyBoost(ev){
   return (ev.choices || []).some(c => (c.good && c.good.academy > 0) || (c.effect && c.effect.academy > 0));
 }
+function isAcademicEvent(ev){
+  return (ev.choices || []).some(c => touchesAcademy(c));
+}
+function ensureAcademicEvents(shuffled, before, after, target){
+  const combined = [...before, ...after];
+  let count = combined.filter(isAcademicEvent).length;
+  if(count >= target) return;
+  const candidates = shuffled.filter(e => isAcademicEvent(e) && !combined.includes(e));
+  for(let i = combined.length - 1; i >= 0 && count < target && candidates.length; i--){
+    if(!isAcademicEvent(combined[i])){
+      combined[i] = candidates.shift();
+      count++;
+    }
+  }
+  before.splice(0, before.length, ...combined.slice(0, before.length));
+  after.splice(0, after.length, ...combined.slice(before.length));
+}
 /* 加权随机排序：权重越高越容易被抽中 */
 function weightedShuffle(list, weightFn){
   const items = list.slice(), out = [];
@@ -4308,8 +4325,8 @@ function startYear(){
   const nAfter = n - nBefore;              // 本科 3 / 深造 2
   const pool = REGULAR_EVENTS.filter(e=>e.cond(state)).map(adaptEventForPlayer);
   const shuffled = weightedShuffle(pool, eventDrawWeight);
-  const regularBefore = shuffled.slice(0, nBefore).map(e=>({tag:'常规事件', ...e}));
-  const regularAfter = shuffled.slice(nBefore, n).map(e=>({tag:'常规事件', ...e}));
+  let regularBefore = shuffled.slice(0, nBefore).map(e=>({tag:'常规事件', ...e}));
+  let regularAfter = shuffled.slice(nBefore, n).map(e=>({tag:'常规事件', ...e}));
   // 生物药学：学业值低于 55 时，本年必定出现一次「学业警告」（隐藏特性）
   if(isBioPharmacy() && state.stats.academy < BIO_PHARMACY_LOW_ACADEMY){
     const picked = [...regularBefore, ...regularAfter];
@@ -4322,6 +4339,9 @@ function startYear(){
       }
     }
   }
+  // 每年至少安排 2-3 个会改变学业值的事件，避免某个学年完全碰不到学业抉择。
+  const academicTarget = year < 4 ? 3 : 2;
+  ensureAcademicEvents(shuffled, regularBefore, regularAfter, academicTarget);
   // 随机特殊事件
   const randoms = randomSpecialEvents(state);
 
