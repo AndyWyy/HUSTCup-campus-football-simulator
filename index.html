@@ -249,10 +249,6 @@
   .ach-item .ach-icon{font-size:20px; line-height:1; margin-bottom:5px;}
   .ach-item .ach-name{font-size:10px; line-height:1.3; color:var(--ink); font-weight:700;}
   .ach-item.unlocked{border-color:rgba(245,196,81,.55); background:linear-gradient(150deg,rgba(245,196,81,.12),var(--card2));}
-  .ach-item.inherited{border-color:var(--line); filter:grayscale(1); opacity:.7;}
-  .ach-item.inherited .ach-name{color:var(--sub);}
-  .ach-status{font-size:9px; margin-top:5px; color:var(--sub);}
-  .ach-item.unlocked .ach-status{color:var(--gold);}
   .ach-item.locked{opacity:.45; filter:grayscale(.8);}
   .ach-item.locked .ach-icon{color:var(--sub);}
   .ach-item.locked .ach-name{color:var(--sub);}
@@ -685,10 +681,10 @@ const state = {
           militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
           xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
           wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
+          metWeiShihao:false, metXuBin:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
           stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false },
   achievements:{},
-  achievementScopeVersion:2, // achievements 只记录本档，历史记录单独保存
   achievementClaimed:false,
   achievementPromptShown:false,
   showChoiceDetails:false,
@@ -757,14 +753,6 @@ function loadGame(){
     state.calendarYear = state.calendarYear || 2026;
     state.media = state.media || { fans:50, officials:50, fanMessage:'', officialMessage:'' };
     state.championColleges = state.championColleges || {};
-    if(data.state.achievementScopeVersion !== 2){
-      // 旧档混合了本档和历史成就，先归档全部荣誉，再确认本档达成项。
-      inheritAchievements();
-      state.achievements = Object.fromEntries(ACHIEVEMENTS
-        .filter(a => state.achievements && state.achievements[a.id] && a.check(state))
-        .map(a => [a.id, true]));
-    }
-    state.achievementScopeVersion = 2;
     return true;
   }catch(e){ return false; }
 }
@@ -833,19 +821,12 @@ function achievementCount(){
 
 function renderAchievements(summaryId, gridId){
   if(!$(summaryId) || !$(gridId)) return;
-  const inherited = loadInheritedAchievements();
-  const currentCount = ACHIEVEMENTS.filter(a => state.achievements[a.id]).length;
-  $(summaryId).innerHTML = `本档解锁 <b>${currentCount} / ${ACHIEVEMENTS.length}</b> · 累计解锁 <b>${achievementCount()} / ${ACHIEVEMENTS.length}</b>`;
+  $(summaryId).innerHTML = `已解锁 <b>${achievementCount()} / ${ACHIEVEMENTS.length}</b>`;
   $(gridId).innerHTML = ACHIEVEMENTS.map(a=>{
-    const current = !!state.achievements[a.id];
-    const historical = !!inherited[a.id];
-    const known = current || historical;
-    const status = current ? '本档已解锁' : (historical ? '历史已解锁' : '尚未解锁');
-    const cls = current ? 'unlocked' : (historical ? 'inherited' : 'locked');
-    return `<div class="ach-item ${cls}" title="${known ? status + '：' + a.desc : status}">
-      <div class="ach-icon">${known?a.icon:'?'}</div>
-      <div class="ach-name">${known?a.name:'？？？'}</div>
-      <div class="ach-status">${status}</div>
+    const on = !!state.achievements[a.id] || !!loadInheritedAchievements()[a.id];
+    return `<div class="ach-item ${on?'unlocked':'locked'}" title="${on?a.desc:'尚未解锁'}">
+      <div class="ach-icon">${on?a.icon:'?'}</div>
+      <div class="ach-name">${on?a.name:'？？？'}</div>
     </div>`;
   }).join('');
 }
@@ -2268,13 +2249,17 @@ const BETWEEN_MATCH_EVENTS = [
 ];
 
 function rollEasterEgg(){
+  const weiChance = state.flags.metWeiShihao ? 0 : 0.05;
+  const xuChance = state.flags.metXuBin ? 0 : 0.05;
   const r = Math.random();
-  if(r < 0.05) return EASTER_EVENTS[0];
-  if(r < 0.10) return EASTER_EVENTS[1];
+  if(r < weiChance) return EASTER_EVENTS[0];
+  if(r < weiChance + xuChance) return EASTER_EVENTS[1];
   return null;
 }
 
 function showEasterEgg(ev, onDone){
+  if(ev.name === '韦世豪') state.flags.metWeiShihao = true;
+  if(ev.name === '徐彬') state.flags.metXuBin = true;
   show('scr-event');
   $('evNum').textContent = state.number;
   $('evName').textContent = state.name;
@@ -2861,7 +2846,7 @@ function rollMatchInjury(){
   const base = {前锋:0.025, 中场:0.03, 后卫:0.035, 门将:0.018}[state.position] || 0.025;
   // 值夜班（+1）/ 运动防护讲座（−1）的一次性状态修正，只影响本场比赛
   const fatigue = (state.flags.fatiguedMatch ? 1 : 0) - (state.flags.warmedUpMatch ? 1 : 0);
-  let p = clamp(base + ((tourney.matchInjuryRisk || 0) + fatigue) * 0.025 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.008, 0.14);
+  const p = clamp(base + ((tourney.matchInjuryRisk || 0) + fatigue) * 0.025 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.008, 0.14);
   if((state.injuryShieldYears || 0) > 0) p = Math.min(p * 0.15, 0.02);
   if(Math.random() >= p) return;
   const r = Math.random();
@@ -4308,8 +4293,7 @@ function assignTeam(chosenGroup, chosenName){
   state.injuryShieldYears = 0;
   state.cupSeasonCount = 0;
   state.championColleges = {};
-  state.achievements = {}; // 新档从零记录，历史荣誉通过独立档案展示
-  state.achievementScopeVersion = 2;
+  state.achievements = Object.assign({}, loadInheritedAchievements());   // 继承以往周目已解锁的成就
   state.achievementClaimed = false;
   state.achievementPromptShown = false;
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
@@ -4317,6 +4301,7 @@ function assignTeam(chosenGroup, chosenName){
                   militaryServed:false, transferAttempted:false, transferDone:false, transferExtended:false,
                   xinshengChampion:false, biyeChampion:false, crossExam:false, medicalSplit:false, medicalDirect:false, tongjiChampion:false,
                   wentToField:false, superCupChampion:false, fruitBasket:false, trophyBlessing:false, worldCupPromise:false,
+                  metWeiShihao:false, metXuBin:false,
           pharmacyTrack:'', mentalBreakdown:false, academicWarningHandled:false,
           stayUpChain:false, stayUpPush:false, fatiguedMatch:false, warmedUpMatch:false };
   // 直接入学医学类专业（法医学系、药学院等）在开局即属于同济医学院组，无需分流
