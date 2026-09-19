@@ -598,8 +598,10 @@ function initialSeasonChampions(){
 /* 计算某队本场强度：基础强度 + 状态浮动；若为玩家球队，额外叠加玩家四维表现贡献 */
 function teamStrength(teamName){
   const base = TIER_BASE[teamTier(teamName)];
-  const noise = randInt(-2, 2);   // 各队状态微调
+  const noise = randInt(-4, 4);   // 各队状态微调
   let str = base + noise;
+  const champions = state.seasonChampions || {};
+  if(Object.values(champions).includes(teamName)) str -= 5;   // 卫冕压力与针对性研究
   if(state.team && teamName === state.team.name){
     const perf = performance(state.stats);
     const roleScale = state.squadRole === '替补' ? 0.55 : 1;
@@ -964,7 +966,7 @@ const REGULAR_EVENTS = [
      ch('全力冲刺', 0.7, 'ability', {ability:1,mentality:1}, {mentality:-1}, '你跑出队里前三，教练很满意。', '你拼得太狠，抽筋倒地，有些丢脸。', {pushHard:true}),
      ch('稳步完成', 0.85, 'mentality', {mentality:1}, {ability:-1}, '你稳定发挥，成绩中规中矩。', '你太求稳，成绩平平。'),
      ch('悄悄保存体力', 0.6, 'mentality', {academy:1,mentality:1}, {relation:-1}, '你留了力气，测试后还能学习。', '你被队友看出在偷懒，形象受损。')]},
-  {id:'playmaker', title:'组织核心', cond:s=>true,
+  {id:'playmaker', title:'组织核心', cond:s=>s.position==='中场' || s.position==='前锋',
    desc:'教练考虑把你立为球队的进攻组织核心，责任重大。',
    choices:[
      ch('接下重任', 0.6, 'ability', {relation:2,ability:1}, {mentality:-2}, '你扛起组织大旗，成为球队大脑。', '你被压力压垮，失误连连。'),
@@ -1195,7 +1197,79 @@ const REGULAR_EVENTS = [
    choices:[
      ch('找队友倾诉', 0.75, 'relation', {relation:2, mentality:1}, {mentality:-1}, '队友陪你在操场边坐了很久，你好受了些。', '你说不出口，话到嘴边又咽了回去。'),
      ch('一个人消化', 0.5, 'mentality', {mentality:2}, {mentality:-3}, '你把这件事慢慢消化了，整个人沉稳了很多。', '那几天你一直睡不好，训练也提不起劲。'),
-     ch('去球场发泄', 0.65, 'ability', {ability:2, mentality:-1}, {mentality:-2, ability:-1}, '你在球场跑到脱力，反而轻松了一点。', '你越踢越烦，动作越来越大，被队友拉下场。')]}
+     ch('去球场发泄', 0.65, 'ability', {ability:2, mentality:-1}, {mentality:-2, ability:-1}, '你在球场跑到脱力，反而轻松了一点。', '你越踢越烦，动作越来越大，被队友拉下场。')]},
+  {id:'gk_reaction', title:'门线反应特训', cond:s=>s.position==='门将',
+   desc:'教练安排连续近距离扑救训练，测试你的门线反应。',
+   choices:[
+     ch('加练扑救', 0.68, 'ability', {ability:2, mentality:1}, {mentality:-1}, '你的反应明显快了一拍，扑救成功率更高了。', '连续扑救让你神经紧绷，训练后有些疲惫。'),
+     ch('研究射手习惯', 0.72, 'academy', {academy:1, mentality:1}, {mentality:-1}, '你总结了几个常见射手的习惯，比赛时更有底。', '资料太多，反而让你临场想得太多。'),
+     ch('保存状态', 0.85, 'mentality', {mentality:1}, {ability:-1}, '你控制了训练量，保持了良好状态。', '训练强度不足，教练觉得你有点松懈。')]},
+  {id:'gk_rush', title:'出击时机训练', cond:s=>s.position==='门将',
+   desc:'教练要求你扩大活动范围，主动处理身后的长传球。',
+   choices:[
+     ch('大胆出击', 0.62, 'ability', {ability:2, relation:1}, {mentality:-1}, '你果断出击，多次化解了对方反击。', '一次判断失误让你有些动摇。'),
+     ch('保守守门', 0.85, 'mentality', {mentality:1}, {relation:-1}, '你守住门线，减少了冒险失误。', '教练觉得你活动范围太小。'),
+     ch('和后卫磨合', 0.72, 'relation', {relation:2, mentality:1}, {ability:-1}, '你和后卫明确了出击区域，配合更默契。', '沟通还不够，偶尔还是抢到一起。')]},
+  {id:'gk_distribution', title:'后场出球练习', cond:s=>s.position==='门将',
+   desc:'球队希望你更多参与后场出球，成为第一传发起点。',
+   choices:[
+     ch('稳健短传', 0.82, 'mentality', {relation:1, mentality:1}, {}, '你稳稳把球交给后卫，后场运转顺畅。', '你有些保守，错过了一次快攻机会。'),
+     ch('冒险长传', 0.58, 'ability', {ability:2, relation:1}, {mentality:-1}, '你直接长传找到前锋，制造了反击机会。', '长传偏了，教练提醒你控制风险。'),
+     ch('呼叫后卫接应', 0.72, 'relation', {relation:1, mentality:1}, {relation:-1}, '你主动指挥出球，队友跑位更清晰。', '你的指挥和队友习惯不一致。')]},
+  {id:'gk_penalty_mind', title:'点球心理战', cond:s=>s.position==='门将',
+   desc:'赛前你开始研究对方点球手，门线心理战也是比赛的一部分。',
+   choices:[
+     ch('看录像', 0.72, 'academy', {academy:1, mentality:1}, {mentality:-1}, '你摸清了几个点球手的习惯。', '录像太多，反而让你临场犹豫。'),
+     ch('练扑救', 0.68, 'ability', {ability:2}, {mentality:-1}, '你的扑救动作更果断。', '连续练习让手腕有些发紧。'),
+     ch('调整心态', 0.8, 'mentality', {mentality:2}, {ability:-1}, '你心态更稳，点球面前不再慌张。', '你太放松，训练专注度下降。')]},
+  {id:'def_1v1', title:'一对一防守特训', cond:s=>s.position==='后卫',
+   desc:'速度型前锋连续冲击你的防区，教练专门给你加练。',
+   choices:[
+     ch('卡位', 0.68, 'ability', {ability:2, relation:1}, {mentality:-1}, '你用身体卡住线路，对方很难起速。', '一次选位失误让你被甩开。'),
+     ch('放铲', 0.5, 'ability', {ability:3}, {ability:-1, relation:-1}, '你干净铲球，成功化解危机。', '铲球偏慢，还差点被对方过掉。'),
+     ch('边退边防', 0.8, 'mentality', {mentality:1}, {ability:-1}, '你保持距离，等待队友协防。', '你退得太深，给了对方起脚空间。')]},
+  {id:'def_line_command', title:'防线指挥', cond:s=>s.position==='后卫',
+   desc:'教练让你尝试统一造越位和站位，后防沟通成了关键。',
+   choices:[
+     ch('主动指挥', 0.6, 'relation', {relation:3, mentality:1}, {mentality:-2}, '你喊出了清晰的线路，防线整齐多了。', '你指挥过急，反而让队友有些混乱。'),
+     ch('先听老队员', 0.85, 'relation', {relation:1, mentality:1}, {ability:-1}, '你先融入既有体系，稳定了防线。', '你缺少主见，存在感一般。'),
+     ch('赛后复盘', 0.72, 'academy', {ability:1, academy:1}, {mentality:-1}, '你复盘站位，找到了不少问题。', '你想得太多，场上反而犹豫。')]},
+  {id:'def_play_out', title:'出球后卫转型', cond:s=>s.position==='后卫',
+   desc:'教练希望你更多带球推进，帮助后场化解高位逼抢。',
+   choices:[
+     ch('练长传', 0.7, 'ability', {ability:2}, {mentality:-1}, '你的长传转移更准了。', '长传失误让球队被打反击。'),
+     ch('练带球', 0.6, 'ability', {ability:2, mentality:1}, {ability:-1}, '你开始敢于持球推进。', '带球被断，队友回防很狼狈。'),
+     ch('保持简单', 0.85, 'mentality', {relation:1, mentality:1}, {ability:-1}, '你处理简洁，减少了后场风险。', '你的出球选择太保守。')]},
+  {id:'def_set_piece', title:'定位球攻防', cond:s=>s.position==='后卫',
+   desc:'定位球成为你们的重要得分和防守场景。',
+   choices:[
+     ch('练争顶', 0.68, 'ability', {ability:2, relation:1}, {mentality:-1}, '你争顶更坚决，禁区里更有威胁。', '一次漏人让队友很失望。'),
+     ch('研究对手跑位', 0.72, 'academy', {academy:1, ability:1}, {mentality:-1}, '你提前看录像，盯防更有针对性。', '信息太多，临场反而跟不上。'),
+     ch('专注防守', 0.8, 'mentality', {mentality:1}, {ability:-1}, '你专心卡位，定位球防守更稳。', '你进攻端参与太少。')]},
+  {id:'mid_playmaker', title:'组织核心考验', cond:s=>s.position==='中场',
+   desc:'教练考虑让你控制比赛节奏，承担更多组织任务。',
+   choices:[
+     ch('接下核心职责', 0.6, 'ability', {relation:2, ability:1}, {mentality:-2}, '你扛起组织大旗，成为球队大脑。', '压力太大，你连续出现失误。'),
+     ch('先做辅助', 0.85, 'mentality', {mentality:1}, {relation:-1}, '你继续做好本职工作，稳步成长。', '你错过了上位机会。'),
+     ch('主动分担', 0.72, 'relation', {relation:1, ability:1}, {mentality:-1}, '你分担部分组织任务，获得认可。', '你顾此失彼，两头没做好。')]},
+  {id:'mid_high_press', title:'高位逼抢执行', cond:s=>s.position==='中场',
+   desc:'教练布置高位压迫，要求中场和前锋同步上抢。',
+   choices:[
+     ch('激进上抢', 0.62, 'mentality', {mentality:2, ability:1}, {mentality:-1}, '你抢下关键球，打乱了对方节奏。', '上抢过猛，身后暴露空当。'),
+     ch('保持阵型', 0.82, 'mentality', {mentality:1}, {ability:-1}, '你保持站位，球队阵型更稳。', '逼抢力度不足，对方轻松出球。'),
+     ch('和前锋配合', 0.72, 'relation', {relation:2, ability:1}, {relation:-1}, '你们形成前场包围圈，效果不错。', '配合没对上，反而漏人。')]},
+  {id:'atk_finishing', title:'终结能力特训', cond:s=>s.position==='前锋',
+   desc:'教练针对你的射门和抢点能力安排加练。',
+   choices:[
+     ch('练角度', 0.66, 'ability', {ability:2, mentality:1}, {mentality:-1}, '你的射门角度越来越刁。', '追求角度时反而打偏了。'),
+     ch('练力量', 0.6, 'ability', {ability:2}, {mentality:-1}, '你的射门更有力量。', '一味发力，准度下降了。'),
+     ch('练无球跑位', 0.74, 'mentality', {ability:1, mentality:1}, {ability:-1}, '你跑位更聪明，机会更多了。', '跑位有些脱离队友节奏。')]},
+  {id:'atk_hold_up', title:'背身做球训练', cond:s=>s.position==='前锋',
+   desc:'训练禁区前拿球和策应，帮助你更好地服务全队。',
+   choices:[
+     ch('练护球', 0.68, 'ability', {ability:2}, {mentality:-1}, '你能在对抗中把球护住。', '护球被断，反击很危险。'),
+     ch('练转身', 0.62, 'ability', {ability:2, mentality:1}, {ability:-1}, '你的转身更快，能直接形成射门。', '转身时被对方卡住了。'),
+     ch('多做球', 0.78, 'relation', {relation:2, ability:1}, {relation:-1}, '你给队友做球，进攻更流畅。', '你太无私，自己的威胁下降了。')]}
 ];
 
 /* ---------------- 事件池调整（同济医学院组） ---------------- */
@@ -1883,8 +1957,8 @@ function poisson(lambda){
 /* 依据两队强度模拟基础比分 */
 function simulateBaseScore(sA, sB){
   const diff = clamp(sA - sB, -35, 35);
-  const eA = clamp(1.15 + diff * 0.045, 0.1, 3.8);
-  const eB = clamp(1.15 - diff * 0.045, 0.1, 3.8);
+  const eA = clamp(1.35 + diff * 0.028, 0.4, 2.9);
+  const eB = clamp(1.35 - diff * 0.028, 0.4, 2.9);
   return { a: poisson(eA), b: poisson(eB) };
 }
 /* 玩家单场进球期望（位置 + 四维表现） */
