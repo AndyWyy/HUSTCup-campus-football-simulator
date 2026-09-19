@@ -688,6 +688,28 @@ const state = {
 
 /* ---------------- 本机存档 ---------------- */
 const SAVE_KEY = 'hustcup_save_v1';
+const ACHIEVE_KEY = 'hustcup_achievements_v1';   // 跨周目继承的成就
+
+/* ---------------- 成就继承（跨周目） ---------------- */
+/* 已解锁成就单独存在一份持久档案，一局生涯结束时并入，新开局自动继承 */
+function loadInheritedAchievements(){
+  try{ return JSON.parse(localStorage.getItem(ACHIEVE_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveInheritedAchievements(map){
+  try{ localStorage.setItem(ACHIEVE_KEY, JSON.stringify(map || {})); }catch(e){ /* 忽略 */ }
+}
+function inheritAchievements(){
+  if(!state.achievements) return;
+  const store = loadInheritedAchievements();
+  let changed = false;
+  Object.keys(state.achievements).forEach(id => {
+    if(state.achievements[id] && !store[id]){ store[id] = true; changed = true; }
+  });
+  if(changed) saveInheritedAchievements(store);
+}
+function inheritedAchievementCount(){
+  return Object.keys(loadInheritedAchievements()).length;
+}
 
 function saveGame(){
   if(!state.name || !state.team) return;
@@ -4152,7 +4174,7 @@ function assignTeam(chosenGroup, chosenName){
   state.militaryYearsRemaining = 0;
   state.cupSeasonCount = 0;
   state.championColleges = {};
-  state.achievements = {};
+  state.achievements = Object.assign({}, loadInheritedAchievements());   // 继承以往周目已解锁的成就
   state.achievementClaimed = false;
   state.achievementPromptShown = false;
   state.flags = { bigInjury:false, jiaChampion:false, yiChampion:false, proTrial:false, extendGraduation:false, varsity:false, wasCaptain:false,
@@ -4724,6 +4746,7 @@ function yearEnd(){
 function showEnding(){
   const e = determineEnding(state);
   checkAchievements(state);
+  inheritAchievements();   // 本局已解锁的成就并入跨周目档案
   clearSave();
   $('edTag').textContent = e.tag;
   $('edTitle').textContent = e.title;
@@ -4750,7 +4773,7 @@ function setupAchievementClaim(){
     state.achievementClaimed = true;
     $('achClaimOverlay').classList.remove('show');
     const title = encodeURIComponent(`全成就玩家登记：${id}`);
-    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2.2\n达成时间：${new Date().toLocaleString('zh-CN')}`);
+    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2.3\n达成时间：${new Date().toLocaleString('zh-CN')}`);
     window.open(`https://github.com/Fantasicrap/HUSTCup-campus-football-simulator/issues/new?title=${title}&body=${body}&labels=full-achievement`, '_blank');
   };
   $('achClaimCancel').onclick = ()=>{
