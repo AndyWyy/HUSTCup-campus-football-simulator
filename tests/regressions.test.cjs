@@ -159,7 +159,9 @@ test('doctoral labels agree with milestones, including delayed masters graduatio
 test('inherited achievements survive initialization and save migration', () => {
   const { run } = game();
   run("state.achievements.first_goal=true;inheritAchievements();assignTeam('甲组',GROUPS['甲组'][0]);saveGame();loadGame();");
-  assert.equal(run('state.achievements.first_goal'), true);
+  assert.equal(run('!!state.achievements.first_goal'), false);
+  assert.equal(run('loadInheritedAchievements().first_goal'), true);
+  assert.equal(run('achievementCount()'), 1);
 });
 
 test('achievement workflow treats titles as data and appends each exact name only once', () => {
@@ -228,4 +230,42 @@ test('military protection reduces injury probability without eliminating injurie
     assert.doesNotThrow(() => run('rollMatchInjury();'));
     assert.equal(run('!!state.injury'), injured);
   }
+});
+
+
+test('new careers render archived achievements gray, current achievements gold, and unknown ones hidden', () => {
+  const { run } = game();
+  run("saveInheritedAchievements({first_goal:true});assignTeam('甲组',GROUPS['甲组'][0]);renderAchievements('summary','grid');");
+  assert.equal(run('Object.keys(state.achievements).length'), 0);
+  assert.match(run("document.getElementById('summary').innerHTML"), /本档解锁 <b>0 \/ 30<\/b> · 累计解锁 <b>1 \/ 30<\/b>/);
+  assert.match(run("document.getElementById('grid').innerHTML"), /ach-item inherited[\s\S]*?处子进球[\s\S]*?历史已解锁/);
+  assert.match(run("document.getElementById('grid').innerHTML"), /ach-item locked[\s\S]*?？？？/);
+  run("state.careerGoals=1;checkAchievements(state);renderAchievements('summary','grid');");
+  assert.equal(run('state.achievements.first_goal'), true);
+  assert.equal(run('achievementCount()'), 1);
+  assert.match(run("document.getElementById('grid').innerHTML"), /ach-item unlocked[\s\S]*?处子进球[\s\S]*?本档已解锁/);
+});
+
+test('legacy mixed saves keep all historical honors but only highlight demonstrable current achievements', () => {
+  const { run } = game();
+  run("state.achievements={first_goal:true,all_rounder:true};state.careerGoals=1;delete state.achievementScopeVersion;saveGame();loadGame();");
+  assert.equal(run('state.achievements.first_goal'), true);
+  assert.equal(run('!!state.achievements.all_rounder'), false);
+  assert.equal(run('loadInheritedAchievements().all_rounder'), true);
+  assert.equal(run('achievementCount()'), 2);
+  assert.equal(run('state.achievementScopeVersion'), 2);
+});
+
+test('current unlocks remain highlighted after save reload even if their transient condition no longer holds', () => {
+  const { run } = game();
+  run("state.achievements={all_rounder:true};saveGame();state.achievements={};loadGame();");
+  assert.equal(run('state.achievements.all_rounder'), true);
+});
+
+test('full-achievement registration still counts archived honors in a fresh career', () => {
+  const { run } = game();
+  run("saveInheritedAchievements(Object.fromEntries(ACHIEVEMENTS.map(a=>[a.id,true])));assignTeam('甲组',GROUPS['甲组'][0]);checkAchievements(state);");
+  assert.equal(run('Object.keys(state.achievements).length'), 0);
+  assert.equal(run('achievementCount()'), run('ACHIEVEMENTS.length'));
+  assert.equal(run('state.achievementPromptShown'), true);
 });
