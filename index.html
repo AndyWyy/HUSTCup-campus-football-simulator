@@ -4788,7 +4788,7 @@ function setupAchievementClaim(){
     state.achievementClaimed = true;
     $('achClaimOverlay').classList.remove('show');
     const title = encodeURIComponent(`全成就玩家登记：${id}`);
-    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v1.2.3\n达成时间：${new Date().toLocaleString('zh-CN')}`);
+    const body = encodeURIComponent(`游戏 ID / 名字：${id}\n版本：v2.0\n达成时间：${new Date().toLocaleString('zh-CN')}`);
     window.open(`https://github.com/Fantasicrap/HUSTCup-campus-football-simulator/issues/new?title=${title}&body=${body}&labels=full-achievement`, '_blank');
   };
   $('achClaimCancel').onclick = ()=>{
