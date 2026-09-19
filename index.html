@@ -668,6 +668,8 @@ const state = {
   militaryYearsTotal:0,
   militaryYearsCompleted:0,
   militaryYearsRemaining:0,
+  militaryLowInjury:false,
+  injuryShieldYears:0,
   medical:false,
   tongji:false,            // 是否属于同济医学院组（华工杯同济医学院组）
   medicalCupAlias:false,   // 第一/第二临床学院在主校区赛事中以基础医学院名义出战时置为 true
@@ -1595,8 +1597,9 @@ function militaryEvent(s){
   return {tag:'服役 · 年度选择', title:'保留学籍 · 参军服役', auto:false,
     desc:'学校开始征兵工作。你可以选择服役两年，服役期间保留原学籍，两年后返回原年级继续学业。',
     choices:[
-      {text:'选择服役两年', detail:'50%：学业+3、能力+3；50%：学业-2、能力+6', effect:{}, result:'', serviceYears:2, resolve:s=>{
+      {text:'选择服役两年', detail:'50%：学业+3、能力+3；50%：学业-2、能力+6；另有90%概率：返校后两年伤病概率极低', effect:{}, result:'', serviceYears:2, resolve:s=>{
           s.flags.militaryServed = true;
+          s.militaryLowInjury = Math.random() < 0.9;
           if(Math.random() < 0.5){
             return {effect:{academy:3,ability:3}, result:'两年的军旅生活磨炼了你的意志，也让你养成了更自律的作息。返校后，你的学业状态和精神面貌焕然一新。'};
           }
@@ -1724,13 +1727,13 @@ function randomSpecialEvents(s){
   const list = [];
   const p = performance(s);
   // 小伤 15%
-  if(Math.random()<0.10){
+  if((state.injuryShieldYears || 0) <= 0 && Math.random()<0.10){
     list.push({tag:'随机特殊事件', title:'友谊赛受伤 · 小伤', auto:true,
       desc:'一场友谊赛中你扭伤了脚踝，需要休养两周。',
       choices:[{text:'接受现实', effect:{ability:-2,mentality:-1}, result:'你安心养伤，两周后归队，状态略有下滑。'}]});
   }
   // 大伤 4%
-  if(!state.flags.bigInjury && Math.random()<0.025){
+  if((state.injuryShieldYears || 0) <= 0 && !state.flags.bigInjury && Math.random()<0.025){
     list.push({tag:'随机特殊事件', title:'友谊赛受伤 · 大伤', auto:true,
       desc:'一场比赛中你遭遇严重伤病——韧带撕裂，需要手术并休学一年。',
       choices:[{text:'接受手术', effect:{ability:-6,mentality:-3,academy:-3}, result:'你做了手术，休学一年。这一年，像被按下了暂停键。', bigInjury:true}]});
@@ -2156,7 +2159,9 @@ const BETWEEN_MATCH_EVENTS = [
   {tag:'赛事间歇 · 抉择', title:'野球邀约', desc:'下一场比赛还有 2 天，球队的学长拉你去踢野球，你去不去？',
    choices:[
     {text:'去', effect:{relation:1, mentality:1}, result:'', resolve:s=>{
-      const risk = clamp(0.30 - (s.stats.ability - 60) * 0.0075, 0.08, 0.30);
+      const risk = (state.injuryShieldYears || 0) > 0
+        ? 0.02
+        : clamp(0.30 - (s.stats.ability - 60) * 0.0075, 0.08, 0.30);
       if(Math.random() < risk){
         setInjury('脚踝扭伤', '轻微', 1, {ability:-1, mentality:-1, relation:-1}, '野球中不慎受伤');
         return {effect:{relation:1, mentality:1}, result:'你去了野球场，和学长们踢得很尽兴，但不慎扭伤脚踝，需要休息一场。'};
@@ -2835,6 +2840,7 @@ function rollMatchInjury(){
   // 值夜班（+1）/ 运动防护讲座（−1）的一次性状态修正，只影响本场比赛
   const fatigue = (state.flags.fatiguedMatch ? 1 : 0) - (state.flags.warmedUpMatch ? 1 : 0);
   const p = clamp(base + ((tourney.matchInjuryRisk || 0) + fatigue) * 0.025 - (state.stats.ability - 60) * 0.0004 - (state.stats.mentality - 60) * 0.0003, 0.008, 0.14);
+  if((state.injuryShieldYears || 0) > 0) p = Math.min(p * 0.15, 0.02);
   if(Math.random() >= p) return;
   const r = Math.random();
   if(r < 0.45){
@@ -4276,6 +4282,8 @@ function assignTeam(chosenGroup, chosenName){
   state.militaryYearsTotal = 0;
   state.militaryYearsCompleted = 0;
   state.militaryYearsRemaining = 0;
+  state.militaryLowInjury = false;
+  state.injuryShieldYears = 0;
   state.cupSeasonCount = 0;
   state.championColleges = {};
   state.achievements = Object.assign({}, loadInheritedAchievements());   // 继承以往周目已解锁的成就
@@ -4694,7 +4702,7 @@ function chooseOption(ev, i){
   let result = c.result || '';
   const drained = bioPharmacyChoiceDrain();   // 生物药学：低学业心态消耗
   if(c.resolve){ const r = c.resolve(state); eff = r.effect||eff; result = r.result||result; }
-  if(c.risk==='bigInjury' && Math.random()<0.08){ // 带伤硬扛 8% 恶化
+  if(c.risk==='bigInjury' && Math.random() < ((state.injuryShieldYears || 0) > 0 ? 0.02 : 0.08)){ // 带伤硬扛 8% 恶化
     state.flags.bigInjury=true; state.repeatYear=true;
     eff = {...eff, ability: (eff.ability||0)-5, mentality: (eff.mentality||0)-2};
     result += '（伤情突然恶化，你不得不接受手术，休学一年……）';
@@ -4780,7 +4788,12 @@ function showResult(result, eff, serviceYears=0, note=''){
 /* ---------------- 保留学籍服役年份 ---------------- */
 function serviceYear(){
   if(state.militaryYearsRemaining <= 0){
-    addLog('服役结束，保留学籍重返校园', '服役');
+    if(state.militaryLowInjury){
+      state.injuryShieldYears = 2;
+      addLog('服役结束，保留学籍重返校园。服役后的身体状态极佳：未来两年伤病概率极低。', '服役');
+    } else {
+      addLog('服役结束，保留学籍重返校园', '服役');
+    }
     renderMain();
     show('scr-main');
     return;
@@ -4847,7 +4860,7 @@ function yearEnd(){
   const isFinal = state.year >= academicYears(state.path, state) - 1;
 
   if(isFinal){ $('btnYearEnd').textContent='查看结局'; $('btnYearEnd').onclick=()=>showEnding(); }
-  else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ state.year++; state.calendarYear = (state.calendarYear || 2026) + 1; renderMain(); show('scr-main'); }; }
+  else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ if(state.injuryShieldYears > 0) state.injuryShieldYears--; state.year++; state.calendarYear = (state.calendarYear || 2026) + 1; renderMain(); show('scr-main'); }; }
   show('scr-year');
 }
 
