@@ -17,12 +17,14 @@ jobs:
 
       - name: Append achiever to list
         shell: bash
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
-          raw_title="${{ github.event.issue.title }}"
+          raw_title="$ISSUE_TITLE"
           name="${raw_title#全成就玩家登记：}"
           name="${name:-${raw_title}}"
           line="- ${name}"
-          if ! grep -F "$line" FULL_ACHIEVERS.md; then
+          if ! grep -Fxq -- "$line" FULL_ACHIEVERS.md; then
             printf '%s\n' "$line" >> FULL_ACHIEVERS.md
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"

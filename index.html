@@ -586,6 +586,8 @@ function weightedPickByTier(teams){
   return teams[teams.length - 1];
 }
 
+const CHAMPION_KEYS = { '甲组':'jia', '乙组':'yi', '同济组':'tongji' };
+
 function initialSeasonChampions(){
   const jia = weightedPickByTier(GROUPS['甲组']);
   const yi = weightedPickByTier(GROUPS['甲组'].filter(name => name !== jia));
@@ -683,6 +685,8 @@ const state = {
   showChoiceDetails:false,
   repeatYear:false,
   extendedYears:0,
+  completedUndergradYears:null, // 跨考后保留已完成的本科学制
+  phdStartYear:null,           // 硕博衔接时记录博士起始学年
   log:[]
 };
 
@@ -727,7 +731,20 @@ function loadGame(){
   try{
     const data = JSON.parse(localStorage.getItem(SAVE_KEY));
     if(!data || !data.state || !data.state.team) return false;
+    const defaultFlags = { ...state.flags };
     Object.assign(state, data.state);
+    state.flags = { ...defaultFlags, ...data.state.flags };
+    state.rosters = state.rosters || {};
+    Object.keys(GROUPS).forEach(league => {
+      if(!Array.isArray(state.rosters[league])) state.rosters[league] = GROUPS[league].slice();
+    });
+    const champions = state.seasonChampions || {};
+    const fallback = initialSeasonChampions();
+    state.seasonChampions = {};
+    Object.entries(CHAMPION_KEYS).forEach(([league, key]) => {
+      // 旧版本曾把最新赛果写到中文字段，优先迁移这些赛果。
+      state.seasonChampions[key] = champions[league] || champions[key] || fallback[key];
+    });
     state.calendarYear = state.calendarYear || 2026;
     state.media = state.media || { fans:50, officials:50, fanMessage:'', officialMessage:'' };
     state.championColleges = state.championColleges || {};
@@ -1273,7 +1290,7 @@ function milestoneEvent(year, s){
           return {effect:{mentality:-2}, result:'你在竞选中落败，有些失落，但也看清了自己的差距。'};
         }},
       {text:'支持他人', effect:{relation:2,mentality:1}, result:'你主动推举了队友，自己在队里也很有分量。'}]};
-  if(year === (s.medical ? 4 : 3)) return {
+  if(year === undergraduateYears(s) - 1) return {
     tag: s.medical ? '医学大五 · 升学抉择' : '大四 · 升学抉择', title:'升学抉择', auto:false,
     desc: s.medical ? '医学大五结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。' : '大四结束，你站在了人生的十字路口。足球与学业，都将在此刻作出选择。',
     choices:[
@@ -1307,7 +1324,7 @@ function milestoneEvent(year, s){
           const a = s.stats.academy;
           const p = clamp(0.15 + (s.flags.militaryServed ? 0.12 : 0) + (a - 65) * 0.013, 0.08, s.flags.militaryServed ? 0.8 : 0.72);
           if(Math.random() < p){
-            assignTransferCollege(s, false);
+            assignTransferCollege(s, false, true);
             s.flags.crossExam = true;
             if(Math.random() < 0.3){
               s.path='外校深造';
@@ -1321,7 +1338,7 @@ function milestoneEvent(year, s){
         }},
       {text:'直接就业', effect:{}, result:'你决定毕业后先走向社会，绿茵场上的故事即将收尾。', path:'就业'}]};
   // 深造年份
-  const undergradYears = s.medical ? 5 : 4;
+  const undergradYears = undergraduateYears(s);
   if(s.path==='读研'){
     if(year === undergradYears + 2 + (s.extendedYears || 0)){ // 研三延后：读博抉择
       return { tag:'深造 · 年度特殊事件', title:'读博抉择', auto:false,
@@ -1329,7 +1346,7 @@ function milestoneEvent(year, s){
         choices:[
           {text:'继续读博', effect:{}, result:'', resolve:s=>{
               const p = statProb({academy:0.015}, 0.2, 0.05, 0.9)(s);  // 学业越高越容易读博
-              if(Math.random() < p){ s.path='读博'; return {effect:{academy:1}, result:'你成功申请到读博资格，学术之路还将再延续三年。'}; }
+              if(Math.random() < p){ s.phdStartYear = s.year + 1; s.path='读博'; return {effect:{academy:1}, result:'你成功申请到读博资格，学术之路还将再延续三年。'}; }
               return {effect:{mentality:-2}, result:'你没能获得读博资格，只能硕士毕业走向社会。'};
             }},
           {text:'硕士毕业就业', effect:{}, result:'你决定硕士毕业后走向社会，绿茵生涯即将画上句点。'}]};
@@ -1348,7 +1365,7 @@ function milestoneEvent(year, s){
       choices:[{text:'继续前行', effect:{}, result:'你在科研与绿茵之间，努力走好自己的路。'}]};
   }
   if(s.path==='读博'){
-    const g = year - (undergradYears + 3);
+    const g = year - (s.phdStartYear ?? (undergradYears + 3));
     const titles=['博一 · 课题开题','博二 · 实验攻关','博三 · 博士答辩'];
     return { tag:'深造 · 年度特殊事件', title:g < 3 ? (titles[g]||'博士生阶段') : `博${chineseNumber(g + 1)} · 延毕攻坚`, auto:true,
       desc:'博士阶段的科研压力与日俱增，足球成了你为数不多的出口。',
@@ -1515,7 +1532,8 @@ function refereeJoinEvent(s){
 }
 
 /* ---------------- 转专业考试 ---------------- */
-function assignTransferCollege(s, sophomore){
+function assignTransferCollege(s, sophomore, preserveUndergrad=false){
+  s.completedUndergradYears = preserveUndergrad ? undergraduateYears(s) : null;
   const oldName = s.team.name;
   const all = [...GROUPS['甲组'], ...GROUPS['乙组']].filter(name => name !== oldName);
   const name = pick(all);
@@ -1985,10 +2003,10 @@ function isKnockoutMatch(match){
   return match && (match.stage === 'knockout' || match.isKey);
 }
 
-function simulateLeagueCup(league){
+function simulateLeagueCup(league, completedGroups=null){
   const teams = state.rosters[league].slice();
-  const groups = groupTeams(teams, groupSizesFor('华工杯', league));
-  groups.forEach(g => { g.matches = simulateGroupMatches(g, null); });
+  const groups = completedGroups || groupTeams(teams, groupSizesFor('华工杯', league));
+  if(!completedGroups) groups.forEach(g => { g.matches = simulateGroupMatches(g, null); });
   const perGroup = league === '甲组' ? 4 : 2;
   let matches = buildBracket(groups, perGroup).map(m => ({ home:m.home, away:m.away, hg:null, ag:null, winner:null }));
   while(matches.length > 1){
@@ -2889,9 +2907,9 @@ function finishTournament(){
     state.seasonChampions = state.seasonChampions || initialSeasonChampions();
     const lastRound = t.knockoutRounds ? t.knockoutRounds[t.knockoutRounds.length - 1] : null;
     const ownChampion = lastRound && lastRound[0] ? lastRound[0].winner : null;
-    if(ownChampion) state.seasonChampions[t.league] = ownChampion;
-    ['甲组','乙组','同济组'].filter(league => league !== t.league).forEach(league => {
-      state.seasonChampions[league] = simulateLeagueCup(league);
+    Object.entries(CHAMPION_KEYS).forEach(([league, key]) => {
+      state.seasonChampions[key] = league === t.league && ownChampion
+        ? ownChampion : simulateLeagueCup(league, league === t.league ? t.groups : null);
     });
   }
   let result = { rank: '小组未出线', title: `${t.type} 小组赛折戟`, eff: {mentality: -1}, prose: `你们在本届${t.type}中未能从小组赛出线，带着遗憾结束了征程。` };
@@ -3952,12 +3970,15 @@ const MEDICAL_YEAR_NAMES = ['医学大一','医学大二','医学大三','医学
 const CN_NUMBERS = ['零','一','二','三','四','五','六','七','八','九','十'];
 function chineseNumber(n){ return n <= 10 ? CN_NUMBERS[n] : String(n); }
 function yearName(y, path){
-  const undergradYears = state.medical ? 5 : 4;
-  if(y < undergradYears) return state.medical ? (MEDICAL_YEAR_NAMES[y] || '医学本科') : YEAR_NAMES[y];
+  const undergradYears = undergraduateYears(state);
+  if(y < undergradYears) return undergradYears === 5 ? (MEDICAL_YEAR_NAMES[y] || '医学本科') : YEAR_NAMES[y];
   const g = y - undergradYears;
   if(path==='读研') return g < 3 ? (['研一','研二','研三'][g] || '研究生') : `研${chineseNumber(g + 1)}`;
   if(path==='直博') return g < 4 ? (['博一','博二','博三','博四'][g] || '博士生') : `博${chineseNumber(g + 1)}`;
-  if(path==='读博') return g < 3 ? (['博一','博二','博三'][g] || '博士生') : `博${chineseNumber(g + 1)}`;
+  if(path==='读博'){
+    const phdYear = y - (state.phdStartYear ?? (undergradYears + 3));
+    return phdYear < 3 ? (['博一','博二','博三'][phdYear] || '博士生') : `博${chineseNumber(phdYear + 1)}`;
+  }
   return YEAR_NAMES[y]||'深造';
 }
 
@@ -3980,9 +4001,12 @@ function baseTotalYears(path){
   if(path==='读博') return 10;
   return 4;
 }
+function undergraduateYears(s){
+  return s.completedUndergradYears ?? (s.medical ? 5 : 4);
+}
 function academicYears(path, s){
   const target = s || state;
-  return baseTotalYears(path) + (target.medical ? 1 : 0) + (target.extendedYears || 0);
+  return baseTotalYears(path) + undergraduateYears(target) - 4 + (target.extendedYears || 0);
 }
 function totalYears(path){
   return academicYears(path, state) + (state.flags.militaryServed ? 2 : 0) + (state.flags.transferExtended ? 1 : 0);
@@ -4156,6 +4180,8 @@ function assignTeam(chosenGroup, chosenName){
   state.suspension = { matchesLeft:0 };
   state.media = { fans:50, officials:50, fanMessage:'', officialMessage:'' };
   state.extendedYears = 0;
+  state.completedUndergradYears = null;
+  state.phdStartYear = null;
   state.militaryYearsTotal = 0;
   state.militaryYearsCompleted = 0;
   state.militaryYearsRemaining = 0;
@@ -4245,7 +4271,7 @@ function stayUpChainedTrainingEvent(){
 }
 function isEndMilestone(s){
   const y = s.year;
-  const undergradYears = s.medical ? 5 : 4;
+  const undergradYears = undergraduateYears(s);
   if(y===undergradYears-1) return true;  // 本科末年升学
   const ext = s.extendedYears || 0;
   if(s.path==='读研' && y===undergradYears+2+ext) return true;  // 研三/延后读博抉择
@@ -4262,7 +4288,7 @@ function needsMedicalHomeIdentity(){
 function medicalHomeIdentityHooks(){
   let savedTeam = null;
   return {
-    before:()=>{ savedTeam = state.team; state.team = { name:'基础医学院', group:'同济组' }; state.medicalCupAlias = true; },
+    before:()=>{ if(!needsMedicalHomeIdentity()) return; savedTeam = state.team; state.team = { name:'基础医学院', group:'同济组' }; state.medicalCupAlias = true; },
     after:()=>{ if(savedTeam){ state.team = savedTeam; state.league = savedTeam.group; } state.medicalCupAlias = false; }
   };
 }
@@ -4328,7 +4354,7 @@ function startYear(){
     if(needsMedicalHomeIdentity()) Object.assign(xinshengCup, medicalHomeIdentityHooks());
     seq.push(xinshengCup);
   } else if(year >= 2){
-    seq.push({ type:'tourney', tourney:'新生杯', role:'coach', cond: s => s.isCaptain });
+    seq.push({ type:'tourney', tourney:'新生杯', role:'coach', cond: s => s.isCaptain, ...medicalHomeIdentityHooks() });
   }
   // 常规事件（多）
   regularBefore.forEach(e => seq.push({ type:'event', ev: e }));
@@ -4346,7 +4372,7 @@ function startYear(){
   const refereeEv = refereeYearEvent(state);
   if(refereeEv) seq.push({ type:'event', ev: refereeEv });
   // 毕业杯（本科毕业年级与深造毕业年级都要参赛）
-  const undergradFinal = state.year === (state.medical ? 4 : 3);
+  const undergradFinal = state.year === undergraduateYears(state) - 1;
   const gradFinal = year === academicYears(state.path, state) - 1;
   if(undergradFinal || gradFinal){
     const biyeCup = { type:'tourney', tourney:'毕业杯', role:'player' };
@@ -4364,13 +4390,17 @@ function startYear(){
 
 function processQueue(){
   if(queue.length === 0){ return yearEnd(); }
-  const item = queue.shift();
+  let item = queue.shift();
   state.yearPlanDone++;
   // 熬夜看球连锁：本学年下一个事件必定是体测或晨训加练
   if(item.type === 'event' && state.flags.stayUpChain){
     state.flags.stayUpChain = false;
     const forced = stayUpChainedTrainingEvent();
-    if(forced) item.ev = forced;
+    if(forced){
+      queue.unshift(item); // 插入训练，不丢弃原来的升学、分流等事件。
+      item = { type:'event', ev:forced };
+      state.yearPlanTotal++;
+    }
   }
   if(item.type === 'supercup' || item.type === 'supercup-preview'){
     if(item.cond && !item.cond(state)){ return processQueue(); }
@@ -4720,7 +4750,7 @@ function yearEnd(){
   }
 
   // 判断是否结束生涯
-  const isFinal = state.year === academicYears(state.path, state) - 1;
+  const isFinal = state.year >= academicYears(state.path, state) - 1;
 
   if(isFinal){ $('btnYearEnd').textContent='查看结局'; $('btnYearEnd').onclick=()=>showEnding(); }
   else { $('btnYearEnd').textContent='进入下一年'; $('btnYearEnd').onclick=()=>{ state.year++; state.calendarYear = (state.calendarYear || 2026) + 1; renderMain(); show('scr-main'); }; }
